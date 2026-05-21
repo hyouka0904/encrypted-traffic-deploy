@@ -1,25 +1,39 @@
-# Setup
+# encrypted-traffic-deploy
 
-```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-```
+Raspberry Pi 5 AP 部署專案，提供 Captive Portal 登入、流量分類與 QoS 控制。
 
-## Usage
-
-**啟動流量監控與 QoS 控制**
-```bash
-sudo python inference/flow_monitor.py
-```
-# Raspberry Pi AP 設定說明
-
-**裝置**：Raspberry Pi 5 (8GB)，hostname: `MadChicken`
-**目標**：讓 wlan1（USB 網卡）作為 AP，在沒有外部網路時仍可透過 WiFi 連上樹莓派
+**配套訓練專案**：[encrypted-traffic-train](https://github.com/hyouka0904/encrypted-traffic-train)
 
 ---
 
-## 網路介面配置
+## Clone
+
+```bash
+git clone https://github.com/hyouka0904/encrypted-traffic-deploy.git
+cd encrypted-traffic-deploy
+```
+
+---
+
+## 安裝套件
+
+```bash
+pip3 install -r requirements.txt --break-system-packages
+```
+
+Portal 使用 `sudo` 執行，需另外為 root 安裝 Flask：
+
+```bash
+sudo python3 -m pip install flask --break-system-packages
+```
+
+---
+
+## Raspberry Pi AP 設定
+
+**裝置**：Raspberry Pi 5 (8GB)，hostname: `MadChicken`
+
+### 網路介面配置
 
 | 介面 | 硬體 | 角色 |
 |------|------|------|
@@ -28,41 +42,28 @@ sudo python inference/flow_monitor.py
 
 ---
 
-## 步驟一：更換 wlan1 驅動
-
-預設的 `rtl8xxxu` 驅動不支援 AP 模式，需換成 `rtl8188eus`。
+### 步驟一：更換 wlan1 驅動
 
 ```bash
-# 安裝編譯依賴
 sudo apt install -y git build-essential dkms bc linux-headers-$(uname -r)
-
-# 下載驅動原始碼
 git clone https://github.com/aircrack-ng/rtl8188eus.git
 cd rtl8188eus
-
-# Blacklist 舊驅動
 echo "blacklist rtl8xxxu" | sudo tee /etc/modprobe.d/rtl8188eus.conf
-
-# 編譯並安裝
 sudo make
 sudo make install
-
-# 載入新驅動
 sudo modprobe -r rtl8xxxu
 sudo modprobe 8188eu
 ```
 
-> **注意**：使用 DKMS 概念安裝，kernel 小版本升級會自動重編。大版本升級（約每 2 年）時若編譯失敗，`wlan1` 會暫時消失，但 `wlan0` 不受影響。
+> RTL8188EU 驅動在 AP 模式下 WPA 加密無法正常運作，只能使用開放網路。
 
 ---
 
-## 步驟二：讓 NetworkManager 忽略 wlan1
+### 步驟二：讓 NetworkManager 忽略 wlan1
 
 ```bash
 sudo nano /etc/NetworkManager/conf.d/99-unmanaged.conf
 ```
-
-填入：
 
 ```ini
 [keyfile]
@@ -75,13 +76,11 @@ sudo systemctl restart NetworkManager
 
 ---
 
-## 步驟三：設定 wlan1 靜態 IP
+### 步驟三：設定 wlan1 靜態 IP
 
 ```bash
 sudo nano /etc/systemd/network/10-wlan1.network
 ```
-
-填入：
 
 ```ini
 [Match]
@@ -98,13 +97,11 @@ sudo systemctl restart systemd-networkd
 
 ---
 
-## 步驟四：設定 hostapd
+### 步驟四：設定 hostapd
 
 ```bash
 sudo nano /etc/hostapd/hostapd.conf
 ```
-
-填入：
 
 ```
 interface=wlan1
@@ -118,23 +115,11 @@ auth_algs=1
 ignore_broadcast_ssid=0
 ```
 
-> **重要**：RTL8188EU 驅動在 AP 模式下 WPA 加密無法正常運作，只能使用開放網路。
-
-設定 hostapd 設定檔路徑：
-
 ```bash
 sudo nano /etc/default/hostapd
-```
-
-修改為：
-
-```
+# 修改為：
 DAEMON_CONF="/etc/hostapd/hostapd.conf"
-```
 
-啟用服務：
-
-```bash
 sudo systemctl unmask hostapd
 sudo systemctl enable hostapd
 sudo systemctl restart hostapd
@@ -142,28 +127,22 @@ sudo systemctl restart hostapd
 
 ---
 
-## 步驟五：設定 dnsmasq（DHCP）
-
-備份原設定：
+### 步驟五：設定 dnsmasq（DHCP）
 
 ```bash
 sudo mv /etc/dnsmasq.conf /etc/dnsmasq.conf.bak
-```
-
-建立新設定：
-
-```bash
 sudo nano /etc/dnsmasq.conf
 ```
 
-填入：
-
 ```
 interface=wlan1
+bind-interfaces
 dhcp-range=192.168.4.10,192.168.4.50,255.255.255.0,24h
 domain=local
 address=/gw.local/192.168.4.1
 ```
+
+> `bind-interfaces` 確保 dnsmasq 只監聽 wlan1，不影響 wlan0 的 DNS。不使用 DNS 劫持，避免干擾多網卡 client 的其他連線。
 
 ```bash
 sudo systemctl enable dnsmasq
@@ -172,9 +151,40 @@ sudo systemctl restart dnsmasq
 
 ---
 
+### 步驟六：Captive Portal
+
+採用純 iptables 攔截方式，不做 DNS 劫持，不影響 client 其他網卡的連線。
+
+**運作原理**
+
+1. client 連上 `my_rpi_AP` 取得 IP
+2. OS 自動發送 HTTP 連線偵測（`/hotspot-detect.html`、`/generate_204` 等）
+3. iptables 將所有 port 80 流量導向 Flask（192.168.4.1:8080）
+4. Flask 回傳 302，OS 跳出 Captive Portal 視窗
+5. 使用者點擊「連線」→ Flask 將該 IP 加入 iptables 白名單 → 放行所有流量
+
+**目錄結構**
+
+```
+portal/
+├── app.py
+├── setup_iptables.sh
+└── templates/
+    └── portal.html
+```
+
+**啟動**
+
+```bash
+sudo bash portal/setup_iptables.sh
+sudo python3 portal/app.py
+```
+
+---
+
 ## 連線方式
 
-連上 `my_rpi_AP`（無密碼），即可 SSH 進入：
+連上 `my_rpi_AP`（無密碼），通過 Captive Portal 後可正常上網，亦可 SSH：
 
 ```bash
 ssh user@192.168.4.1
@@ -186,7 +196,10 @@ DHCP 派發範圍：`192.168.4.10` ~ `192.168.4.50`
 
 ## 待完成
 
-- [ ] Captive Portal（強制登入頁面）：連上 AP 後自動跳出驗證網頁
-  - iptables 導流 HTTP/HTTPS 至本機
-  - nginx 或 Python Flask 登入頁面
-  - 驗證後放行流量
+- [ ] 每次斷開連接都要重登
+- [ ] **systemd 開機自啟**：portal 服務開機自動啟動
+- [ ] **模型載點**：在 [encrypted-traffic-train](https://github.com/hyouka0904/encrypted-traffic-train) 發布 GitHub Releases，並在此加入下載指令將模型放至 `models/`
+- [ ] **流量請求網站**：讓 client 可選擇不同流量類型（影片串流、檔案下載、網頁瀏覽等），供 QoS 實驗使用
+  - ⚠️ 此實驗**必須在 wlan0 正常轉送的前提下進行**。若僅提供本機服務，流量特徵與 ISCX-VPN 訓練資料不符，模型分類結果無參考價值（僅可做 pipeline 功能測試）
+- [ ] ML 模型整合（`models/`）：接上 flow_monitor → policy → controller 完整流程
+- [ ] QoS policy / monitor / controller 設計
