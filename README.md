@@ -18,7 +18,9 @@ cd encrypted-traffic-deploy
 ## 安裝套件
 
 ```bash
-pip3 install -r requirements.txt --break-system-packages
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
 ```
 
 Portal 使用 `sudo` 執行，需另外為 root 安裝 Flask：
@@ -196,10 +198,35 @@ DHCP 派發範圍：`192.168.4.10` ~ `192.168.4.50`
 
 ## 待完成
 
-- [ ] 每次斷開連接都要重登
-- [ ] **systemd 開機自啟**：portal 服務開機自動啟動
-- [ ] **模型載點**：在 [encrypted-traffic-train](https://github.com/hyouka0904/encrypted-traffic-train) 發布 GitHub Releases，並在此加入下載指令將模型放至 `models/`
-- [ ] **流量請求網站**：讓 client 可選擇不同流量類型（影片串流、檔案下載、網頁瀏覽等），供 QoS 實驗使用
-  - ⚠️ 此實驗**必須在 wlan0 正常轉送的前提下進行**。若僅提供本機服務，流量特徵與 ISCX-VPN 訓練資料不符，模型分類結果無參考價值（僅可做 pipeline 功能測試）
+- [ ] **每次斷開連接都要重登**：portal 認證狀態記憶體存放，重啟或斷線即消失，需持久化
+
+**Portal / 登入頁面**
+- [ ] systemd 開機自啟：portal 服務開機自動啟動
+- [ ] 登入頁加入使用條款（Agreement notice）與專案說明
+- [ ] 登入後顯示使用統計（Usage statistics）
+- [ ] 管理員帳號登入導向 Admin Dashboard
+
+**Admin Dashboard**
+- [ ] 即時監控儀表板：連線裝置數、即時頻寬、延遲、CPU/RAM、訊號強度、各裝置流量
+- [ ] 用戶行為分析：連線時間、在線時長、每裝置流量、尖峰時段
+- [ ] 使用報告：總流量、平均延遲、最活躍裝置、尖峰時段、uptime
+- [ ] Web 控制面板：SSID 設定、頻寬限制、裝置封鎖、監控圖表、效能測試
+
+**流量管理**
+- [ ] 個別頻寬控制（Per-user Bandwidth Control）：使用 `tc` 實作，可依群組設定不同速度
+- [ ] QoS 優先權模式：視訊會議（高）、遊戲（低延遲）、網頁（一般）、下載（低優先）
+- [ ] 流量請求網站：讓 client 選擇流量類型供 QoS 實驗使用
+  - ⚠️ 必須在 wlan0 正常轉送前提下進行，否則流量特徵與 ISCX-VPN 訓練資料不符
+
+**ML 推論整合**
 - [ ] ML 模型整合（`models/`）：接上 flow_monitor → policy → controller 完整流程
 - [ ] QoS policy / monitor / controller 設計
+
+**資安**
+- [ ] 未知裝置告警、登入失敗偵測
+- [ ] MAC 過濾、黑白名單
+- [ ] 異常流量警示
+
+**可靠性**
+- [ ] 自動自我修復（Watchdog）：自動重啟 hostapd、重新連網、送出警示記錄
+- [ ] 多模式 AP：一般、訪客、低延遲、省電、實驗模式
