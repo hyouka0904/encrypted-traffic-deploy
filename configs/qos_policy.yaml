@@ -1,0 +1,37 @@
+interface: wlan1        
+total_bandwidth: 100  
+
+classes:
+  VOIP:
+    rate: 10
+    ceil: 30
+    priority: 0         
+
+  STREAMING:
+    rate: 20
+    ceil: 60
+    priority: 1         
+
+  CHAT:
+    rate: 5
+    ceil: 20
+    priority: 2         
+
+  BROWSING:
+    rate: 10
+    ceil: 50
+    priority: 3        
+
+  MAIL:
+    rate: 2
+    ceil: 20
+    priority: 5        
+
+  FT:
+    rate: 5
+    ceil: 40
+    priority: 6         
+  P2P:
+    rate: 2
+    ceil: 10
+    priority: 7         
