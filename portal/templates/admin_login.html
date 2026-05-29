@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Login</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: sans-serif;
+      background: #f0f4f8;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 2rem;
+      max-width: 360px;
+      width: 90%;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+    }
+    h1 { font-size: 1.4rem; margin-bottom: 0.5rem; text-align: center; }
+    p  { color: #666; margin-bottom: 1.5rem; font-size: 0.9rem; text-align: center; }
+    label { display: block; font-size: 0.85rem; margin-bottom: 0.25rem; color: #334155; }
+    input {
+      width: 100%;
+      padding: 0.6rem 0.75rem;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 1rem;
+      margin-bottom: 1rem;
+    }
+    button {
+      background: #0f766e;
+      color: white;
+      border: none;
+      padding: 0.75rem 2rem;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+      width: 100%;
+    }
+    button:hover { background: #0d9488; }
+    .error {
+      background: #fef2f2;
+      color: #b91c1c;
+      padding: 0.6rem 0.75rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      margin-bottom: 1rem;
+    }
+    .back {
+      display: block;
+      margin-top: 1.25rem;
+      text-align: center;
+      font-size: 0.85rem;
+      color: #64748b;
+      text-decoration: none;
+    }
+    .back:hover { color: #2563eb; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Admin Login</h1>
+    <p>Sign in to view authorized clients.</p>
+    {% if error %}
+    <div class="error">{{ error }}</div>
+    {% endif %}
+    <form method="POST" action="/admin/login">
+      <label for="username">Username</label>
+      <input id="username" name="username" type="text" required autocomplete="username">
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" required autocomplete="current-password">
+      <button type="submit">Sign in</button>
+    </form>
+    <a class="back" href="/">Back to portal</a>
+  </div>
+</body>
+</html>

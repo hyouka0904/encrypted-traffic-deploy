@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MadChicken AP</title>
+  <title>Connected</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -23,37 +23,25 @@
       text-align: center;
       box-shadow: 0 4px 16px rgba(0,0,0,0.1);
     }
-    h1 { font-size: 1.4rem; margin-bottom: 0.5rem; }
+    h1 { font-size: 1.4rem; margin-bottom: 0.5rem; color: #15803d; }
     p  { color: #666; margin-bottom: 1.5rem; font-size: 0.9rem; }
-    button {
+    a {
+      display: inline-block;
       background: #2563eb;
       color: white;
-      border: none;
+      text-decoration: none;
       padding: 0.75rem 2rem;
       border-radius: 8px;
       font-size: 1rem;
-      cursor: pointer;
-      width: 100%;
     }
-    button:hover { background: #1d4ed8; }
-    .admin-link {
-      display: block;
-      margin-top: 1.25rem;
-      font-size: 0.85rem;
-      color: #64748b;
-      text-decoration: none;
-    }
-    .admin-link:hover { color: #2563eb; }
+    a:hover { background: #1d4ed8; }
   </style>
 </head>
 <body>
   <div class="card">
-    <h1>MadChicken AP</h1>
-    <p>Click below to connect to the network.</p>
-    <form method="POST" action="/user/authorize">
-      <button type="submit">Connect as User</button>
-    </form>
-    <a class="admin-link" href="/admin/login">Admin login</a>
+    <h1>Connected</h1>
+    <p>You are authorized as <strong>{{ ip }}</strong>. You can browse the internet now.</p>
+    <a href="http://example.com">Continue browsing</a>
   </div>
 </body>
 </html>
