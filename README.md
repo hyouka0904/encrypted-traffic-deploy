@@ -31,6 +31,26 @@ sudo python3 -m pip install flask --break-system-packages
 
 ---
 
+## 環境變數設定
+
+啟動前必須設定以下環境變數（建議寫入 `/etc/environment` 或 systemd unit 的 `Environment=`）：
+
+| 變數 | 說明 |
+|------|------|
+| `FLASK_SECRET_KEY` | Session 加密金鑰，請設為隨機長字串 |
+| `ADMIN_USER` | Admin 帳號名稱（預設 `admin`） |
+| `ADMIN_PASSWORD_HASH` | Admin 密碼的 Werkzeug hash（見下方產生方式） |
+
+**產生 Admin 密碼 Hash：**
+
+```bash
+python3 -c "from werkzeug.security import generate_password_hash; print(generate_password_hash('你的密碼'))"
+```
+
+將輸出的字串設為 `ADMIN_PASSWORD_HASH`。
+
+---
+
 ## Raspberry Pi AP 設定
 
 **裝置**：Raspberry Pi 5 (8GB)，hostname: `MadChicken`
@@ -163,24 +183,38 @@ sudo systemctl restart dnsmasq
 2. OS 自動發送 HTTP 連線偵測（`/hotspot-detect.html`、`/generate_204` 等）
 3. iptables 將所有 port 80 流量導向 Flask（192.168.4.1:8080）
 4. Flask 回傳 302，OS 跳出 Captive Portal 視窗
-5. 使用者點擊「連線」→ Flask 將該 IP 加入 iptables 白名單 → 放行所有流量
+5. 使用者註冊並等待 Admin 在 Dashboard 審核通過
+6. 登入後進入 Status 頁面，IP 自動加入 iptables 白名單，可正常上網
 
 **目錄結構**
 
 ```
 portal/
 ├── app.py
+├── portal.db              # SQLite（自動建立）
 ├── setup_iptables.sh
 └── templates/
-    └── portal.html
+    ├── portal.html            # 首頁（登入/註冊入口）
+    ├── login.html             # 使用者登入
+    ├── register.html          # 帳號申請
+    ├── register_success.html  # 申請成功（等待審核提示）
+    ├── status.html            # 登入後狀態頁
+    ├── admin_login.html       # Admin 登入
+    └── admin_dashboard.html   # Admin 審核 + 已授權 IP 列表
 ```
 
 **啟動**
 
 ```bash
+export FLASK_SECRET_KEY="your-random-secret"
+export ADMIN_USER="admin"
+export ADMIN_PASSWORD_HASH="pbkdf2:sha256:..."   # 用上方指令產生
+
 sudo bash portal/setup_iptables.sh
-sudo python3 portal/app.py
+sudo -E python3 portal/app.py
 ```
+
+> `portal.db` 會在第一次啟動時自動建立於 `portal/` 目錄下。
 
 ---
 
@@ -198,13 +232,11 @@ DHCP 派發範圍：`192.168.4.10` ~ `192.168.4.50`
 
 ## 待完成
 
-- [ ] **每次斷開連接都要重登**：portal 認證狀態記憶體存放，重啟或斷線即消失，需持久化
-
 **Portal / 登入頁面**
+- [ ] **每次斷開連接都要重登**：portal 認證狀態記憶體存放，重啟或斷線即消失，需持久化（iptables 白名單 + session 同步寫回磁碟）
 - [ ] systemd 開機自啟：portal 服務開機自動啟動
 - [ ] 登入頁加入使用條款（Agreement notice）與專案說明
-- [ ] 登入後顯示使用統計（Usage statistics）
-- [ ] 管理員帳號登入導向 Admin Dashboard
+- [ ] Status 頁面補充內容（目前預留空白）：DHCP 租約列表（從 dnsmasq leases 讀取）等
 
 **Admin Dashboard**
 - [ ] 即時監控儀表板：連線裝置數、即時頻寬、延遲、CPU/RAM、訊號強度、各裝置流量
@@ -215,8 +247,7 @@ DHCP 派發範圍：`192.168.4.10` ~ `192.168.4.50`
 **流量管理**
 - [ ] 個別頻寬控制（Per-user Bandwidth Control）：使用 `tc` 實作，可依群組設定不同速度
 - [ ] QoS 優先權模式：視訊會議（高）、遊戲（低延遲）、網頁（一般）、下載（低優先）
-- [ ] 流量請求網站：讓 client 選擇流量類型供 QoS 實驗使用
-  - ⚠️ 必須在 wlan0 正常轉送前提下進行，否則流量特徵與 ISCX-VPN 訓練資料不符
+- [ ] 流量實驗 API：新增 `POST /experiment/start {"ip": "...", "label": "VOIP"}` 與 `POST /experiment/stop` endpoint，供 client 腳本標記 ground truth；Pi 端紀錄時間段與 ML 推論結果，可在 Admin Dashboard 顯示對照精確度
 
 **ML 推論整合**
 - [ ] ML 模型整合（`models/`）：接上 flow_monitor → policy → controller 完整流程
