@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Admin Dashboard</title>
+  <title>Admin Dashboard – MadChicken AP</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -12,40 +12,170 @@
       min-height: 100vh;
       padding: 2rem 1rem;
     }
-    .wrap { max-width: 520px; margin: 0 auto; }
+    .wrap { max-width: 620px; margin: 0 auto; display: flex; flex-direction: column; gap: 1.25rem; }
     .card {
       background: white;
       border-radius: 12px;
-      padding: 2rem;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+      padding: 1.75rem;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.08);
     }
-    h1 { font-size: 1.4rem; margin-bottom: 0.25rem; }
-    .sub { color: #666; font-size: 0.9rem; margin-bottom: 1.5rem; }
-    ul { list-style: none; }
-    li {
+    .card-title {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+      color: #0f172a;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .badge {
+      font-size: 0.75rem;
+      background: #fee2e2;
+      color: #b91c1c;
+      border-radius: 999px;
+      padding: 0.1rem 0.55rem;
+      font-weight: 600;
+    }
+    .badge.ok { background: #dcfce7; color: #15803d; }
+
+    /* pending list */
+    .user-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
       padding: 0.6rem 0.75rem;
       border: 1px solid #e2e8f0;
       border-radius: 8px;
       margin-bottom: 0.5rem;
-      font-family: monospace;
-      font-size: 0.95rem;
+      gap: 0.5rem;
     }
-    .empty { color: #64748b; font-size: 0.9rem; }
-    .actions { margin-top: 1.5rem; display: flex; gap: 1rem; }
-    a {
-      font-size: 0.9rem;
+    .user-row .name { font-weight: 600; font-size: 0.95rem; }
+    .user-row .ts   { font-size: 0.78rem; color: #94a3b8; }
+    .actions { display: flex; gap: 0.4rem; }
+    button.approve {
+      background: #16a34a; color: white;
+      border: none; padding: 0.35rem 0.75rem;
+      border-radius: 6px; font-size: 0.82rem; cursor: pointer;
+    }
+    button.approve:hover { background: #15803d; }
+    button.reject {
+      background: white; color: #b91c1c;
+      border: 1.5px solid #fca5a5;
+      padding: 0.35rem 0.75rem;
+      border-radius: 6px; font-size: 0.82rem; cursor: pointer;
+    }
+    button.reject:hover { background: #fef2f2; }
+
+    /* approved list */
+    .ip-row {
+      padding: 0.5rem 0.75rem;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      margin-bottom: 0.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .ip-row .username { font-weight: 600; font-size: 0.9rem; }
+    .ip-row .tc {
+      font-size: 0.78rem;
+      background: #eff6ff;
       color: #2563eb;
-      text-decoration: none;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
     }
-    a:hover { text-decoration: underline; }
-    a.logout { color: #b91c1c; }
+    .ip-row .tc.none { background: #f1f5f9; color: #94a3b8; }
+
+    /* authorized IPs */
+    ul { list-style: none; }
+    li {
+      padding: 0.5rem 0.75rem;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      margin-bottom: 0.5rem;
+      font-family: monospace;
+      font-size: 0.9rem;
+    }
+    .empty { color: #94a3b8; font-size: 0.9rem; }
+
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.25rem;
+    }
+    h1 { font-size: 1.4rem; }
+    a.logout { font-size: 0.85rem; color: #b91c1c; text-decoration: none; }
+    a.logout:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <div class="card">
+    <div class="top-bar">
       <h1>Admin Dashboard</h1>
-      <p class="sub">Authorized client IPs</p>
+      <a class="logout" href="/logout">Logout</a>
+    </div>
+
+    <!-- Pending approvals -->
+    <div class="card">
+      <p class="card-title">
+        Pending Approvals
+        {% if pending %}
+        <span class="badge">{{ pending | length }}</span>
+        {% else %}
+        <span class="badge ok">0</span>
+        {% endif %}
+      </p>
+      {% if pending %}
+        {% for u in pending %}
+        <div class="user-row">
+          <div>
+            <div class="name">{{ u.username }}</div>
+            <div class="ts">{{ u.created_at }}</div>
+          </div>
+          <div class="actions">
+            <form method="POST" action="/admin/approve/{{ u.id }}" style="display:inline">
+              <button class="approve" type="submit">Approve</button>
+            </form>
+            <form method="POST" action="/admin/reject/{{ u.id }}" style="display:inline">
+              <button class="reject" type="submit">Reject</button>
+            </form>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <p class="empty">No pending requests.</p>
+      {% endif %}
+    </div>
+
+    <!-- Approved users -->
+    <div class="card">
+      <p class="card-title">
+        Approved Users
+        <span class="badge ok">{{ approved | length }}</span>
+      </p>
+      {% if approved %}
+        {% for u in approved %}
+        <div class="ip-row">
+          <span class="username">{{ u.username }}</span>
+          {% if u.traffic_class %}
+          <span class="tc">{{ u.traffic_class }}</span>
+          {% else %}
+          <span class="tc none">no class set</span>
+          {% endif %}
+        </div>
+        {% endfor %}
+      {% else %}
+        <p class="empty">No approved users yet.</p>
+      {% endif %}
+    </div>
+
+    <!-- Authorized IPs -->
+    <div class="card">
+      <p class="card-title">
+        Authorized IPs (this session)
+        <span class="badge ok">{{ ips | length }}</span>
+      </p>
       {% if ips %}
       <ul>
         {% for ip in ips %}
@@ -55,11 +185,8 @@
       {% else %}
       <p class="empty">No clients authorized yet.</p>
       {% endif %}
-      <div class="actions">
-        <a href="/">Portal</a>
-        <a class="logout" href="/logout">Logout</a>
-      </div>
     </div>
+
   </div>
 </body>
 </html>

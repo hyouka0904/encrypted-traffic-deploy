@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Admin Login</title>
+  <title>Register – MadChicken AP</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -22,8 +22,8 @@
       width: 90%;
       box-shadow: 0 4px 16px rgba(0,0,0,0.1);
     }
-    h1 { font-size: 1.4rem; margin-bottom: 0.5rem; text-align: center; }
-    p  { color: #666; margin-bottom: 1.5rem; font-size: 0.9rem; text-align: center; }
+    h1 { font-size: 1.4rem; margin-bottom: 0.25rem; }
+    .sub { color: #666; font-size: 0.9rem; margin-bottom: 1.5rem; }
     label { display: block; font-size: 0.85rem; margin-bottom: 0.25rem; color: #334155; }
     input {
       width: 100%;
@@ -34,16 +34,16 @@
       margin-bottom: 1rem;
     }
     button {
-      background: #0f766e;
+      background: #2563eb;
       color: white;
       border: none;
-      padding: 0.75rem 2rem;
+      padding: 0.75rem;
       border-radius: 8px;
       font-size: 1rem;
       cursor: pointer;
       width: 100%;
     }
-    button:hover { background: #0d9488; }
+    button:hover { background: #1d4ed8; }
     .error {
       background: #fef2f2;
       color: #b91c1c;
@@ -52,32 +52,34 @@
       font-size: 0.85rem;
       margin-bottom: 1rem;
     }
-    .back {
-      display: block;
+    .footer {
       margin-top: 1.25rem;
-      text-align: center;
       font-size: 0.85rem;
       color: #64748b;
-      text-decoration: none;
+      text-align: center;
     }
-    .back:hover { color: #2563eb; }
+    .footer a { color: #2563eb; text-decoration: none; }
+    .footer a:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
   <div class="card">
-    <h1>Admin Login</h1>
-    <p>Sign in to view authorized clients.</p>
+    <h1>Create Account</h1>
+    <p class="sub">Your account will be active after admin approval.</p>
     {% if error %}
     <div class="error">{{ error }}</div>
     {% endif %}
-    <form method="POST" action="/admin/login">
+    <form method="POST" action="/register">
       <label for="username">Username</label>
       <input id="username" name="username" type="text" required autocomplete="username">
       <label for="password">Password</label>
-      <input id="password" name="password" type="password" required autocomplete="current-password">
-      <button type="submit">Sign in</button>
+      <input id="password" name="password" type="password" required autocomplete="new-password">
+      <button type="submit">Register</button>
     </form>
-    <a class="back" href="/">Back to portal</a>
+    <div class="footer">
+      Already have an account? <a href="/login">Sign in</a><br>
+      <a href="/" style="color:#94a3b8; margin-top:0.5rem; display:inline-block;">← Back</a>
+    </div>
   </div>
 </body>
 </html>
