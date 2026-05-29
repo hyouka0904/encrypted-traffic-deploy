@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: sans-serif;
+      background: #f0f4f8;
+      min-height: 100vh;
+      padding: 2rem 1rem;
+    }
+    .wrap { max-width: 520px; margin: 0 auto; }
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 2rem;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+    }
+    h1 { font-size: 1.4rem; margin-bottom: 0.25rem; }
+    .sub { color: #666; font-size: 0.9rem; margin-bottom: 1.5rem; }
+    ul { list-style: none; }
+    li {
+      padding: 0.6rem 0.75rem;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      margin-bottom: 0.5rem;
+      font-family: monospace;
+      font-size: 0.95rem;
+    }
+    .empty { color: #64748b; font-size: 0.9rem; }
+    .actions { margin-top: 1.5rem; display: flex; gap: 1rem; }
+    a {
+      font-size: 0.9rem;
+      color: #2563eb;
+      text-decoration: none;
+    }
+    a:hover { text-decoration: underline; }
+    a.logout { color: #b91c1c; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Admin Dashboard</h1>
+      <p class="sub">Authorized client IPs</p>
+      {% if ips %}
+      <ul>
+        {% for ip in ips %}
+        <li>{{ ip }}</li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="empty">No clients authorized yet.</p>
+      {% endif %}
+      <div class="actions">
+        <a href="/">Portal</a>
+        <a class="logout" href="/logout">Logout</a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
