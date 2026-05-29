@@ -19,12 +19,10 @@ ADMIN_PASSWORD_HASH = os.environ.get("ADMIN_PASSWORD_HASH", "")
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "portal.db")
 
-TRAFFIC_LABELS = ["BROWSING", "CHAT", "FT", "MAIL", "P2P", "STREAMING", "VOIP"]
-
 authorized_ips: set[str] = set()
 
 
-# ── Database ─────────────────────────────────────────────────────────
+# ── Database ──────────────────────────────────────────────────────────
 
 def init_db():
     with get_db() as db:
@@ -118,7 +116,7 @@ def windows_check():
 @app.route("/")
 def portal():
     if session.get("user_logged_in"):
-        return redirect(url_for("traffic_select"))
+        return redirect(url_for("status"))
     if session.get("admin_logged_in"):
         return redirect(url_for("admin_dashboard"))
     return render_template("portal.html")
@@ -164,38 +162,18 @@ def login():
             session["username"] = username
             session["traffic_class"] = user["traffic_class"]
             authorize_ip(client_ip())
-            return redirect(url_for("traffic_select"))
+            return redirect(url_for("status"))
     return render_template("login.html", error=error)
 
-@app.route("/traffic", methods=["GET", "POST"])
+@app.route("/status")
 @user_required
-def traffic_select():
-    ip = client_ip()
-    message = None
-    if request.method == "POST":
-        label = request.form.get("label", "")
-        if label in TRAFFIC_LABELS:
-            # 更新 DB 記錄
-            with get_db() as db:
-                db.execute(
-                    "UPDATE users SET traffic_class = ? WHERE username = ?",
-                    (label, session["username"])
-                )
-            session["traffic_class"] = label
-            # 呼叫 QoS controller
-            try:
-                import qos_controller
-                qos_controller._mark_ip(ip, label)
-            except Exception as e:
-                print(f"[qos] warning: {e}")
-            message = f"Traffic class set to {label}."
+def status():
     return render_template(
-        "traffic_select.html",
-        labels=TRAFFIC_LABELS,
-        current=session.get("traffic_class"),
-        ip=ip,
+        "status.html",
+        ip=client_ip(),
         username=session.get("username"),
-        message=message,
+        traffic_class=session.get("traffic_class") or "—",
+        device_count=len(authorized_ips),
     )
 
 @app.route("/user/logout")
@@ -222,7 +200,7 @@ def admin_login():
             and check_password_hash(ADMIN_PASSWORD_HASH, password)
         ):
             session["admin_logged_in"] = True
-            authorize_ip(client_ip())          # ← bug fix
+            authorize_ip(client_ip())
             return redirect(url_for("admin_dashboard"))
         error = "Invalid username or password."
     return render_template("admin_login.html", error=error)
@@ -235,7 +213,7 @@ def admin_dashboard():
             "SELECT id, username, created_at FROM users WHERE status = 'pending' ORDER BY created_at"
         ).fetchall()
         approved = db.execute(
-            "SELECT id, username, traffic_class, created_at FROM users WHERE status = 'approved' ORDER BY username"
+            "SELECT id, username, traffic_class FROM users WHERE status = 'approved' ORDER BY username"
         ).fetchall()
     return render_template(
         "admin_dashboard.html",
