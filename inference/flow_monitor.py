@@ -167,6 +167,8 @@ class FlowMonitor:
         self.iface        = iface
         self.feature_cols = _load_features(FEATURE_PATH)
 
+        self.ip_label_history: dict[str, list[str]] = {}
+
         self.session    = ort.InferenceSession(str(model_path))
         self.input_name = self.session.get_inputs()[0].name
 
@@ -245,8 +247,20 @@ class FlowMonitor:
                 print(f"[vote]  {ip:<16} votes={votes} → {winner}")
             results.append((ip, winner))
 
-        if results:
-            qos_controller.apply_batch(results)
+        STABLE_N = 3  # 連續幾次相同才改 mark
+
+        stable = []
+        for ip, label in results:
+            history = self.ip_label_history.setdefault(ip, [])
+            history.append(label)
+            if len(history) > STABLE_N:
+                history.pop(0)
+            if len(history) == STABLE_N and len(set(history)) == 1:
+                stable.append((ip, label))
+                print(f"[stable] {ip:<16} → {label} (連續 {STABLE_N} 次)")
+
+        if stable:
+            qos_controller.apply_batch(stable)
 
         # 清除超過 60s 沒有封包的 stale flow
         with self.lock:
