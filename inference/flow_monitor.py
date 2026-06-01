@@ -1,9 +1,7 @@
-
 import argparse
 import time
 import threading
 import numpy as np
-from collections import defaultdict
 from pathlib import Path
 
 from scapy.all import sniff, IP, TCP, UDP
@@ -11,121 +9,151 @@ import onnxruntime as ort
 
 import qos_controller
 
-WINDOW_SEC   = 5      # sec
+TICK_SEC     = 5       # 每幾秒做一次推論
+WINDOW_SEC   = 15      # sliding window 長度（秒）
+IDLE_THRESHOLD_US = 5_000_000  # 5s，單位微秒
+
 MODEL_PATH   = Path(__file__).parent.parent / "models" / "model.onnx"
 FEATURE_PATH = Path(__file__).parent.parent / "models" / "features.txt"
 
-LABELS = ["BROWSING", "CHAT", "FT", "MAIL", "P2P", "STREAMING", "VOIP"]
+
+def _load_features(path: Path) -> list[str]:
+    with open(path) as f:
+        return [line.strip() for line in f if line.strip()]
 
 
 # ── Flow Table ────────────────────────────────────────────────────────
 class FlowRecord:
+    """
+    所有時間單位：微秒（μs）。
+    封包時間戳記在 add_packet 時就轉成 μs 存入。
+    """
 
-    def __init__(self, start_time: float):
-        self.start_time   = start_time
-        self.last_time    = start_time
+    def __init__(self, start_us: float):
+        self.start_us          = start_us
+        self.last_us           = start_us
 
-        self.fwd_times: list[float] = []
-        self.bwd_times: list[float] = []
+        self.all_times: list[float] = []   # μs，用於 flowiat / duration / window 裁切
 
-        # forward / backward bytes
-        self.fwd_bytes: list[int] = []
-        self.bwd_bytes: list[int] = []
+        self.fwd_bytes: list[int]   = []
+        self.bwd_bytes: list[int]   = []
 
-        self.all_times: list[float] = []
+        # active / idle
+        self.active_periods: list[float] = []  # μs
+        self.idle_periods:   list[float] = []  # μs
+        self._last_active_start = start_us
+        self._last_pkt_us       = start_us
 
-        # active / idle interval
-        self.active_periods: list[float] = []
-        self.idle_periods:   list[float] = []
-        self._last_active_start = start_time
-        self._last_pkt_time     = start_time
-        self.IDLE_THRESHOLD     = 1.0   # sec
+    def add_packet(self, ts_sec: float, size: int, is_forward: bool):
+        ts_us = ts_sec * 1e6
 
-    def add_packet(self, ts: float, size: int, is_forward: bool):
-        gap = ts - self._last_pkt_time
-        if gap > self.IDLE_THRESHOLD:
-            self.active_periods.append(self._last_pkt_time - self._last_active_start)
-            self.idle_periods.append(gap)
-            self._last_active_start = ts
+        gap_us = ts_us - self._last_pkt_us
+        if gap_us > IDLE_THRESHOLD_US:
+            active_dur = self._last_pkt_us - self._last_active_start
+            self.active_periods.append(active_dur)
+            self.idle_periods.append(gap_us)
+            self._last_active_start = ts_us
 
-        self._last_pkt_time = ts
-        self.last_time = ts
-        self.all_times.append(ts)
+        self._last_pkt_us = ts_us
+        self.last_us      = ts_us
+        self.all_times.append(ts_us)
 
         if is_forward:
-            self.fwd_times.append(ts)
             self.fwd_bytes.append(size)
         else:
-            self.bwd_times.append(ts)
             self.bwd_bytes.append(size)
 
-    def close(self):
-        # add active period as flow ended
-        self.active_periods.append(self._last_pkt_time - self._last_active_start)
+    def trim_window(self, now_sec: float):
+        """丟掉 window 以外的舊封包（保留最近 WINDOW_SEC 秒）。"""
+        cutoff_us = (now_sec - WINDOW_SEC) * 1e6
+        if not self.all_times or self.all_times[-1] < cutoff_us:
+            return
+        idx = 0
+        while idx < len(self.all_times) and self.all_times[idx] < cutoff_us:
+            idx += 1
+        if idx == 0:
+            return
+        self.all_times   = self.all_times[idx:]
+        # fwd/bwd bytes 沒有對應時間戳，無法精確裁切，保留全部（rate 計算用 duration）
+        # active/idle 同理，保留全部（窗口內的統計近似）
 
 
 def _iat(times: list[float]) -> list[float]:
-    # cal inter-arrival times
+    """計算 inter-arrival time 列表（μs）。"""
     if len(times) < 2:
-        return [0.0]
+        return []
     return [times[i] - times[i - 1] for i in range(1, len(times))]
 
 
-def extract_features(flow: FlowRecord) -> np.ndarray | None:
+def _stats(values: list[float], sentinel: float = -1.0) -> tuple[float, float, float, float]:
+    """回傳 (min, mean, max, std)，無資料時填 sentinel。"""
+    if not values:
+        return sentinel, sentinel, sentinel, sentinel
+    arr = np.array(values, dtype=np.float64)
+    return float(arr.min()), float(arr.mean()), float(arr.max()), float(arr.std())
 
+
+def extract_features(flow: FlowRecord, feature_cols: list[str]) -> np.ndarray | None:
+    """
+    依 feature_cols 順序組出特徵向量。
+    時間單位：μs（duration、flowiat、active、idle）。
+    rate 兩欄（flowPktsPerSecond、flowBytesPerSecond）維持 per-second。
+    """
     if len(flow.all_times) < 4:
-        return None  
-
-    flow.close()
-    duration = flow.last_time - flow.start_time
-    if duration <= 0:
         return None
 
-    fiat = _iat(flow.fwd_times)
-    biat = _iat(flow.bwd_times)
-    flowiat = _iat(flow.all_times)
+    duration_us = flow.last_us - flow.start_us
+    if duration_us <= 0:
+        return None
+    duration_sec = duration_us / 1e6
 
-    total_fiat = float(np.sum(fiat))
-    total_biat = float(np.sum(biat))
-
-    active = flow.active_periods if flow.active_periods else [0.0]
-    idle   = flow.idle_periods   if flow.idle_periods   else [0.0]
+    flowiat = _iat(flow.all_times)   # μs
 
     n_pkts  = len(flow.all_times)
     n_bytes = sum(flow.fwd_bytes) + sum(flow.bwd_bytes)
 
-    features = [
-        duration,
-        total_fiat,
-        total_biat,
-        float(np.min(fiat)),
-        float(np.min(biat)),
-        float(np.max(fiat)),
-        float(np.max(biat)),
-        float(np.mean(fiat)),
-        float(np.mean(biat)),
-        n_pkts  / duration,           # flowPktsPerSecond
-        n_bytes / duration,           # flowBytesPerSecond
-        float(np.min(flowiat)),
-        float(np.max(flowiat)),
-        float(np.mean(flowiat)),
-        float(np.std(flowiat)),
-        float(np.min(active)),
-        float(np.mean(active)),
-        float(np.max(active)),
-        float(np.std(active)),
-        float(np.min(idle)),
-        float(np.mean(idle)),
-        float(np.max(idle)),
-        float(np.std(idle)),
-    ]
-    return np.array(features, dtype=np.float32)
+    # active：加上「目前正在 active 的這段」（flow 還活著，不呼叫 close）
+    current_active = flow._last_pkt_us - flow._last_active_start
+    active = flow.active_periods + ([current_active] if current_active > 0 else [])
+    idle   = flow.idle_periods
+
+    flowiat_min, flowiat_mean, flowiat_max, flowiat_std = _stats(flowiat)
+    active_min, active_mean, active_max, active_std     = _stats(active)
+    idle_min,   idle_mean,   idle_max,   idle_std       = _stats(idle)
+
+    feature_map = {
+        "duration":            duration_us,
+        "flowPktsPerSecond":   n_pkts  / duration_sec,
+        "flowBytesPerSecond":  n_bytes / duration_sec,
+        "min_flowiat":         flowiat_min,
+        "max_flowiat":         flowiat_max,
+        "mean_flowiat":        flowiat_mean,
+        "std_flowiat":         flowiat_std,
+        "min_active":          active_min,
+        "mean_active":         active_mean,
+        "max_active":          active_max,
+        "std_active":          active_std,
+        "min_idle":            idle_min,
+        "mean_idle":           idle_mean,
+        "max_idle":            idle_max,
+        "std_idle":            idle_std,
+    }
+
+    try:
+        vec = [feature_map[col] for col in feature_cols]
+    except KeyError as e:
+        raise RuntimeError(f"features.txt 含未知欄位：{e}")
+
+    return np.array(vec, dtype=np.float32)
 
 
+# ── Monitor ───────────────────────────────────────────────────────────
 class FlowMonitor:
     def __init__(self, iface: str):
-        self.iface   = iface
-        self.session = ort.InferenceSession(str(MODEL_PATH))
+        self.iface        = iface
+        self.feature_cols = _load_features(FEATURE_PATH)
+
+        self.session    = ort.InferenceSession(str(MODEL_PATH))
         self.input_name = self.session.get_inputs()[0].name
 
         self.flow_table: dict[tuple, FlowRecord] = {}
@@ -134,8 +162,9 @@ class FlowMonitor:
         self.infer_thread = threading.Thread(target=self._infer_loop, daemon=True)
         self.infer_thread.start()
 
-        print(f"[monitor] : {iface}  {WINDOW_SEC}s")
-        print(f"[monitor] model: {MODEL_PATH}")
+        print(f"[monitor] iface={iface}  tick={TICK_SEC}s  window={WINDOW_SEC}s")
+        print(f"[monitor] model:    {MODEL_PATH}")
+        print(f"[monitor] features: {self.feature_cols}")
 
     def _make_key(self, pkt) -> tuple | None:
         if not pkt.haslayer(IP):
@@ -154,8 +183,6 @@ class FlowMonitor:
         if key is None:
             return
 
-        # forward key = (src, dst, sp, dp, proto)
-        # backward key = (dst, src, dp, sp, proto)
         rev_key = (key[1], key[0], key[3], key[2], key[4])
         ts   = time.time()
         size = len(pkt)
@@ -166,28 +193,31 @@ class FlowMonitor:
             elif rev_key in self.flow_table:
                 self.flow_table[rev_key].add_packet(ts, size, is_forward=False)
             else:
-                record = FlowRecord(ts)
+                record = FlowRecord(ts * 1e6)
                 record.add_packet(ts, size, is_forward=True)
                 self.flow_table[key] = record
 
     def _infer_loop(self):
         while True:
-            time.sleep(WINDOW_SEC)
+            time.sleep(TICK_SEC)
             self._run_inference()
 
     def _run_inference(self):
+        now = time.time()
+
         with self.lock:
             keys    = list(self.flow_table.keys())
             records = list(self.flow_table.values())
 
         results = []
         for key, flow in zip(keys, records):
-            feat = extract_features(flow)
+            flow.trim_window(now)
+            feat = extract_features(flow, self.feature_cols)
             if feat is None:
                 continue
-            x = feat.reshape(1, -1)
+            x    = feat.reshape(1, -1)
             pred = self.session.run(None, {self.input_name: x})
-            label = pred[0][0]   # string label
+            label  = pred[0][0]   # RF 輸出字串 label
             src_ip = key[0]
             results.append((src_ip, label))
             print(f"[infer] {src_ip:<16} → {label}")
@@ -195,11 +225,10 @@ class FlowMonitor:
         if results:
             qos_controller.apply_batch(results)
 
-        # clear flow without package over 60s
-        now = time.time()
+        # 清除超過 60s 沒有封包的 stale flow
         with self.lock:
             stale = [k for k, v in self.flow_table.items()
-                     if now - v.last_time > 60]
+                     if now - v.last_us / 1e6 > 60]
             for k in stale:
                 del self.flow_table[k]
 
@@ -207,10 +236,9 @@ class FlowMonitor:
         sniff(iface=self.iface, prn=self.packet_callback, store=False)
 
 
-
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--iface", default="wlan1", help="")
+    parser.add_argument("--iface", default="wlan1")
     args = parser.parse_args()
 
     monitor = FlowMonitor(args.iface)
