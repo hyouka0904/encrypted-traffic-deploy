@@ -135,11 +135,10 @@ if __name__ == "__main__":
                         help="清除所有規則後離開")
     args = parser.parse_args()
 
-    if args.ip is None or args.label is None:
-        parser.error("--ip and --label are required unless --clear is used")
-
     if args.clear:
         clear_all()
+    elif args.ip is None or args.label is None:
+        parser.error("--ip and --label are required unless --clear is used")
     else:
         _mark_ip(args.ip, args.label)
         log.info(f"已套用：{args.ip} → {args.label}")
