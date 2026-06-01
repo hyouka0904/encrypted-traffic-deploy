@@ -127,13 +127,16 @@ init_tc()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="手動測試單一 IP 的 QoS 限速")
-    parser.add_argument("--ip",    required=True, help="client IP，例如 192.168.4.2")
-    parser.add_argument("--label", required=True,
+    parser.add_argument("--ip",     help="client IP，例如 192.168.4.2")
+    parser.add_argument("--label", 
                         choices=list(CLASSES.keys()),
                         help="流量類別")
     parser.add_argument("--clear", action="store_true",
                         help="清除所有規則後離開")
     args = parser.parse_args()
+
+    if args.ip is None or args.label is None:
+        parser.error("--ip and --label are required unless --clear is used")
 
     if args.clear:
         clear_all()
