@@ -223,7 +223,8 @@ class FlowMonitor:
             keys    = list(self.flow_table.keys())
             records = list(self.flow_table.values())
 
-        results = []
+        # per-IP 收集所有 flow 的推論結果
+        ip_votes: dict[str, list[str]] = {}
         for key, flow in zip(keys, records):
             flow.trim_window(now)
             feat = extract_features(flow, self.feature_cols)
@@ -231,10 +232,18 @@ class FlowMonitor:
                 continue
             x     = feat.reshape(1, -1)
             pred  = self.session.run(None, {self.input_name: x})
-            label = pred[0][0]  # RF 輸出字串 label
+            label = pred[0][0]
             src_ip = key[0]
-            results.append((src_ip, label))
+            ip_votes.setdefault(src_ip, []).append(label)
             print(f"[infer] {src_ip:<16} → {label}")
+
+        # 多數決：同一 IP 有多條 flow 時取票數最多的 label
+        results = []
+        for ip, votes in ip_votes.items():
+            winner = max(set(votes), key=votes.count)
+            if len(votes) > 1:
+                print(f"[vote]  {ip:<16} votes={votes} → {winner}")
+            results.append((ip, winner))
 
         if results:
             qos_controller.apply_batch(results)
