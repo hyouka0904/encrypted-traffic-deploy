@@ -1,16 +1,57 @@
 # encrypted-traffic-deploy
 
-Raspberry Pi 5 AP 部署專案，提供 Captive Portal 登入、流量分類與 QoS 控制。
+Raspberry Pi 5 AP 部署專案。以 Edimax USB 網卡（wlan1）開 WiFi AP，對連入裝置實施 Captive Portal 強制登入，並以 ONNX Runtime 在 Pi 上執行加密流量分類模型，依推論結果透過 tc HTB 套用 QoS 限速。
 
-**配套訓練專案**：[encrypted-traffic-train](https://github.com/hyouka0904/encrypted-traffic-train)
+**配套訓練專案**：[encrypted-traffic-train](https://github.com/hyouka0904/encrypted-traffic-train)（ISCX-VPN 2016 Scenario B，RandomForest，macro F1 0.886）
 
 ---
 
-## Clone
+## 系統架構
 
-```bash
-git clone https://github.com/hyouka0904/encrypted-traffic-deploy.git
-cd encrypted-traffic-deploy
+```
+client 連上 my_rpi_AP
+        │
+        ▼
+Captive Portal（Flask, portal/app.py）
+  └─ 未登入 → 攔截導向登入頁
+  └─ 登入後 → iptables 白名單放行上網
+        │
+        ▼
+flow_monitor（inference/flow_monitor.py）
+  └─ scapy 抓 wlan1 封包 → 每 5 秒抽特徵 → ONNX Runtime 推論
+        │
+        ▼
+qos_controller（inference/qos_controller.py）
+  └─ iptables mangle FORWARD 打 fwmark → tc HTB 依 class 限速
+```
+
+---
+
+## 目錄結構
+
+```
+encrypted-traffic-deploy/
+├── portal/
+│   ├── app.py                 # Flask Captive Portal
+│   ├── portal.db              # SQLite（自動建立）
+│   ├── setup_iptables.sh      # iptables 攔截規則初始化
+│   └── templates/
+│       ├── portal.html
+│       ├── login.html
+│       ├── register.html
+│       ├── register_success.html
+│       ├── status.html
+│       ├── admin_login.html
+│       └── admin_dashboard.html
+├── inference/
+│   ├── flow_monitor.py        # 即時封包抓取與特徵萃取
+│   └── qos_controller.py      # tc HTB 初始化與 iptables fwmark 控制
+├── models/
+│   ├── model.onnx             # 訓練端匯出的 RandomForest ONNX 模型
+│   └── features.txt           # 特徵欄位順序（與訓練端一致）
+├── configs/
+│   └── qos_policy.yaml        # 各流量 class 的頻寬設定
+└── requirements.txt
 ```
 
 ---
@@ -46,8 +87,6 @@ sudo python3 -m pip install flask --break-system-packages
 ```bash
 python3 -c "from werkzeug.security import generate_password_hash; print(generate_password_hash('你的密碼'))"
 ```
-
-將輸出的字串設為 `ADMIN_PASSWORD_HASH`。
 
 ---
 
@@ -175,8 +214,6 @@ sudo systemctl restart dnsmasq
 
 ### 步驟六：Captive Portal
 
-採用純 iptables 攔截方式，不做 DNS 劫持，不影響 client 其他網卡的連線。
-
 **運作原理**
 
 1. client 連上 `my_rpi_AP` 取得 IP
@@ -186,35 +223,105 @@ sudo systemctl restart dnsmasq
 5. 使用者註冊並等待 Admin 在 Dashboard 審核通過
 6. 登入後進入 Status 頁面，IP 自動加入 iptables 白名單，可正常上網
 
-**目錄結構**
-
-```
-portal/
-├── app.py
-├── portal.db              # SQLite（自動建立）
-├── setup_iptables.sh
-└── templates/
-    ├── portal.html            # 首頁（登入/註冊入口）
-    ├── login.html             # 使用者登入
-    ├── register.html          # 帳號申請
-    ├── register_success.html  # 申請成功（等待審核提示）
-    ├── status.html            # 登入後狀態頁
-    ├── admin_login.html       # Admin 登入
-    └── admin_dashboard.html   # Admin 審核 + 已授權 IP 列表
-```
-
 **啟動**
 
 ```bash
 export FLASK_SECRET_KEY="your-random-secret"
 export ADMIN_USER="admin"
-export ADMIN_PASSWORD_HASH="pbkdf2:sha256:..."   # 用上方指令產生
+export ADMIN_PASSWORD_HASH="pbkdf2:sha256:..."
 
 sudo bash portal/setup_iptables.sh
 sudo -E python3 portal/app.py
 ```
 
 > `portal.db` 會在第一次啟動時自動建立於 `portal/` 目錄下。
+
+---
+
+## QoS 設定（configs/qos_policy.yaml）
+
+定義各流量 class 的頻寬分配，修改後重啟 qos_controller 生效：
+
+| Class | rate | ceil | priority |
+|-------|------|------|----------|
+| VOIP | 10 Mbit | 30 Mbit | 0（最高）|
+| STREAMING | 20 Mbit | 60 Mbit | 1 |
+| CHAT | 5 Mbit | 20 Mbit | 2 |
+| BROWSING | 10 Mbit | 50 Mbit | 3 |
+| MAIL | 2 Mbit | 20 Mbit | 5 |
+| FT | 5 Mbit | 40 Mbit | 6 |
+| P2P | 2 Mbit | 10 Mbit | 7（最低）|
+
+---
+
+## 模型部署（models/）
+
+從訓練端的 GitHub Releases 下載 `model.onnx` 與 `features.txt`，放入 `models/`：
+
+```bash
+mkdir -p models
+# 從 encrypted-traffic-train releases 下載
+wget -O models/model.onnx  <release_url>/model.onnx
+wget -O models/features.txt <release_url>/features.txt
+```
+
+---
+
+## 啟動流程
+
+系統服務（hostapd、dnsmasq）開機自啟，手動啟動的服務依序如下：
+
+**1. 初始化 iptables 攔截規則**
+```bash
+sudo bash portal/setup_iptables.sh
+```
+
+**2. 啟動 Captive Portal**
+```bash
+source venv/bin/activate
+export FLASK_SECRET_KEY="..." ADMIN_USER="admin" ADMIN_PASSWORD_HASH="..."
+sudo -E venv/bin/python portal/app.py
+```
+
+**3. 啟動流量監控與 QoS（需先確認 models/ 已放好 ONNX）**
+```bash
+source venv/bin/activate
+sudo venv/bin/python inference/flow_monitor.py --iface wlan1
+```
+
+> `flow_monitor` 啟動時會自動 import `qos_controller`，後者在 import 時執行 `init_tc()` 初始化 tc HTB。不需要單獨啟動 `qos_controller`。
+
+---
+
+## 關閉流程
+
+```bash
+# 停止 flow_monitor：Ctrl+C 或 kill
+# 清除 tc / iptables QoS 規則
+sudo venv/bin/python inference/qos_controller.py --clear
+
+# 停止 Portal：Ctrl+C 或 kill
+```
+
+> 重開機後 tc 與 iptables 規則自動消失，不需要手動清除。
+
+---
+
+## QoS 單機測試
+
+不跑完整 flow_monitor，直接測試特定 IP 的限速效果：
+
+```bash
+# 套用限速
+sudo venv/bin/python inference/qos_controller.py --ip 192.168.4.2 --label STREAMING
+
+# 驗證規則
+sudo tc -s class show dev wlan1
+sudo iptables -t mangle -L FORWARD -n -v
+
+# 清除
+sudo venv/bin/python inference/qos_controller.py --clear
+```
 
 ---
 
@@ -232,26 +339,22 @@ DHCP 派發範圍：`192.168.4.10` ~ `192.168.4.50`
 
 ## 待完成
 
+**ML 推論整合**
+- [ ] 從 encrypted-traffic-train releases 下載 model.onnx 到 Pi 的 models/
+- [ ] replay 腳本（inference/replay.py）：讀 test.csv 隨機幾列 → ONNX Runtime 推論 → 印預測 vs 真值 → 呼叫 qos_controller 套 QoS
+- [ ] flow_monitor.py 修正：時間單位改為微秒（×1e6）、修 extract_features 重複呼叫 flow.close() 導致 active_periods 累加的 bug、改從 features.txt 讀取特徵順序
+
 **Portal / 登入頁面**
-- [ ] **每次斷開連接都要重登**：portal 認證狀態記憶體存放，重啟或斷線即消失，需持久化（iptables 白名單 + session 同步寫回磁碟）
+- [ ] 每次斷開連接都要重登：portal 認證狀態記憶體存放，重啟或斷線即消失，需持久化（iptables 白名單 + session 同步寫回磁碟）
 - [ ] systemd 開機自啟：portal 服務開機自動啟動
 - [ ] 登入頁加入使用條款（Agreement notice）與專案說明
-- [ ] Status 頁面補充內容（目前預留空白）：DHCP 租約列表（從 dnsmasq leases 讀取）等
+- [ ] Status 頁面補充內容：DHCP 租約列表（從 dnsmasq leases 讀取）等
 
 **Admin Dashboard**
 - [ ] 即時監控儀表板：連線裝置數、即時頻寬、延遲、CPU/RAM、訊號強度、各裝置流量
 - [ ] 用戶行為分析：連線時間、在線時長、每裝置流量、尖峰時段
 - [ ] 使用報告：總流量、平均延遲、最活躍裝置、尖峰時段、uptime
 - [ ] Web 控制面板：SSID 設定、頻寬限制、裝置封鎖、監控圖表、效能測試
-
-**流量管理**
-- [ ] 個別頻寬控制（Per-user Bandwidth Control）：使用 `tc` 實作，可依群組設定不同速度
-- [ ] QoS 優先權模式：視訊會議（高）、遊戲（低延遲）、網頁（一般）、下載（低優先）
-- [ ] 流量實驗 API：新增 `POST /experiment/start {"ip": "...", "label": "VOIP"}` 與 `POST /experiment/stop` endpoint，供 client 腳本標記 ground truth；Pi 端紀錄時間段與 ML 推論結果，可在 Admin Dashboard 顯示對照精確度
-
-**ML 推論整合**
-- [ ] ML 模型整合（`models/`）：接上 flow_monitor → policy → controller 完整流程
-- [ ] QoS policy / monitor / controller 設計
 
 **資安**
 - [ ] 未知裝置告警、登入失敗偵測
