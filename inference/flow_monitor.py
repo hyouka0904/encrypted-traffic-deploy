@@ -157,7 +157,7 @@ class FlowMonitor:
         if model_name != "rf":
             self.label_classes = _load_label_classes(model_path)
         else:
-            None
+            self.label_classes = None
 
         self.flow_table: dict[tuple, FlowRecord] = {}
         self.lock = threading.Lock()
