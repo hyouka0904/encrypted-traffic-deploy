@@ -34,6 +34,14 @@ def _resolve_model(name: str) -> Path:
 def _load_features(path: Path) -> list[str]:
     with open(path) as f:
         return [line.strip() for line in f if line.strip()]
+    
+def _load_label_classes(model_path: Path) -> list[str] | None:
+    """載入與模型同目錄的 label_classes.txt，找不到時回傳 None（代表模型自己輸出字串）。"""
+    path = model_path.parent / "label_classes.txt"
+    if not path.exists():
+        return None
+    with open(path) as f:
+        return [line.strip() for line in f if line.strip()]
 
 
 # ── Flow Table ────────────────────────────────────────────────────────
@@ -171,6 +179,7 @@ class FlowMonitor:
 
         self.session    = ort.InferenceSession(str(model_path))
         self.input_name = self.session.get_inputs()[0].name
+        self.label_classes = _load_label_classes(model_path)
 
         self.flow_table: dict[tuple, FlowRecord] = {}
         self.lock = threading.Lock()
@@ -181,6 +190,10 @@ class FlowMonitor:
         print(f"[monitor] iface={iface}  tick={TICK_SEC}s  window={WINDOW_SEC}s")
         print(f"[monitor] model:    {model_path}")
         print(f"[monitor] features: {self.feature_cols}")
+        if self.label_classes:
+            print(f"[monitor] label_classes: {self.label_classes}")
+        else:
+            print(f"[monitor] label_classes: 模型自帶字串輸出")
 
     def _make_key(self, pkt) -> tuple | None:
         if not pkt.haslayer(IP):
@@ -234,7 +247,11 @@ class FlowMonitor:
                 continue
             x     = feat.reshape(1, -1)
             pred  = self.session.run(None, {self.input_name: x})
-            label = pred[0][0]
+            raw = pred[0][0]
+            if self.label_classes is not None:
+                label = self.label_classes[int(raw)]  # XGB / LGB 輸出 int index
+            else:
+                label = str(raw) 
             src_ip = key[0]
             ip_votes.setdefault(src_ip, []).append(label)
             print(f"[infer] {src_ip:<16} → {label}")
