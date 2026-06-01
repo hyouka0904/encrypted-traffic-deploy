@@ -20,18 +20,8 @@ Captive Portal（Flask, portal/app.py）
   └─ 登入後 → iptables 白名單放行上網
         │
         ▼
-┌─────────────────────────────────────────────┐
-│  分類來源（兩條線）                            │
-│                                             │
-│  [Demo 主線] flow_monitor.py                 │
-│    scapy 即時抓 wlan1 封包 → 抽 15 特徵        │
-│    → ONNX Runtime 推論 → 呼叫 qos_controller  │
-│    現場對照「跑的 app vs 模型猜的」            │
-│                                             │
-│  [模型驗證] replay.py                        │
-│    讀 test.csv → ONNX 推論 → 印準確度          │
-│    證明模型在 ARM 上推論正確                   │
-└─────────────────────────────────────────────┘
+flow_monitor（inference/flow_monitor.py）
+  └─ scapy 即時抓 wlan1 封包 → 抽 15 特徵 → ONNX Runtime 推論
         │
         ▼
 qos_controller（inference/qos_controller.py）
@@ -57,9 +47,8 @@ encrypted-traffic-deploy/
 │       ├── admin_login.html
 │       └── admin_dashboard.html
 ├── inference/
-│   ├── flow_monitor.py        # 即時封包抓取與特徵萃取（Demo 主線）
-│   ├── qos_controller.py      # tc HTB 初始化與 iptables fwmark 控制
-│   └── replay.py              # 模型驗證工具：test.csv → ONNX → 準確度
+│   ├── flow_monitor.py        # 即時封包抓取與特徵萃取
+│   └── qos_controller.py      # tc HTB 初始化與 iptables fwmark 控制
 ├── models/
 │   ├── model.onnx             # 訓練端匯出的 RandomForest ONNX（15 特徵）
 │   └── features.txt           # 特徵欄位順序（與訓練端一致，15 欄）
@@ -395,9 +384,6 @@ min_idle, mean_idle, max_idle, std_idle
 **`qos_controller.py` 正確性確認**
 - [ ] 確認 fwmark 方向：要整形**下行**（client 看影片/下載），mark 必須打在「目的地是 client」的封包（`-d <client_ip>`），且 tc HTB 掛在 wlan1 egress。**若目前是 `-s <client_ip>`（上行，走 wlan0），下行限速不會生效，需修正**
 
-**`replay.py`（模型驗證工具，新增）**
-- [ ] 讀 `test.csv` 幾列 → ONNX Runtime 推論 → 印「預測 vs 真值」準確度。這條線跟即時分類分開，用來證明「模型本身是好的、且能在 Pi（ARM）上跑」
-
 **Demo 主線：即時分類迴路**
 - [ ] client 端跑已知 app（事先排好順序，例如 VOIP 30s → STREAMING 30s）
 - [ ] `flow_monitor` 在 Pi 即時抓封包 → 推論 → 印 log，現場對照「跑的是什麼 vs 模型猜什麼」
@@ -405,7 +391,7 @@ min_idle, mean_idle, max_idle, std_idle
 - [ ] QoS 限速效果用 iperf3 驗證（Pi 開 `iperf3 -s`，兩台 client 各跑一種 app，看吞吐量差異）
 
 **報告**
-- [ ] 報告分開陳述「離線分類效能（replay / test set）」與「部署整合（即時迴路，本次新打通）」
+- [ ] 報告分開陳述「離線分類效能（test set 數字）」與「部署整合（即時迴路，本次新打通）」
 - [ ] 即時特徵保真度列為 future work：fiat/biat 欄位定義與命名不一致，即時 scapy 無法忠實重現；根本解是取得 ISCX 原始 PCAP、用自己控制的特徵提取重算 + 重訓（見訓練端 README）
 
 ---
