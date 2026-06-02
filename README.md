@@ -495,8 +495,9 @@ VOIP / STREAMING / CHAT 未納入實驗：
 sudo bash portal/setup_iptables.sh
 
 # 2. 啟動 Captive Portal（新終端機）
-source venv/bin/activate
-export FLASK_SECRET_KEY="..." ADMIN_USER="admin" ADMIN_PASSWORD_HASH="..."
+export FLASK_SECRET_KEY=$(grep FLASK_SECRET_KEY /etc/environment | cut -d= -f2-)
+export ADMIN_USER=$(grep ADMIN_USER /etc/environment | cut -d= -f2-)
+export ADMIN_PASSWORD_HASH=$(grep ADMIN_PASSWORD_HASH /etc/environment | cut -d= -f2-)
 sudo -E venv/bin/python portal/app.py
 
 # 3. 啟動 flow_monitor，指定本輪模型（新終端機）
@@ -587,8 +588,9 @@ sudo bash portal/setup_iptables.sh
 
 **2. 啟動 Captive Portal**
 ```bash
-source venv/bin/activate
-export FLASK_SECRET_KEY="..." ADMIN_USER="admin" ADMIN_PASSWORD_HASH="..."
+export FLASK_SECRET_KEY=$(grep FLASK_SECRET_KEY /etc/environment | cut -d= -f2-)
+export ADMIN_USER=$(grep ADMIN_USER /etc/environment | cut -d= -f2-)
+export ADMIN_PASSWORD_HASH=$(grep ADMIN_PASSWORD_HASH /etc/environment | cut -d= -f2-)
 sudo -E venv/bin/python portal/app.py
 ```
 
