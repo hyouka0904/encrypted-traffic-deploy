@@ -1,24 +1,30 @@
 #!/bin/bash
 # experiment.sh
-# 隨機順序跑不同流量，記錄 ground truth log 供事後準確度對照
+# 固定實驗序列，記錄 ground truth log 供事後與推論結果對照計算準確度。
+# 三個模型（rf / xgb / lgb）使用同一份序列，各自跑一次，各自評分。
 #
 # 用法：
-#   bash experiment/experiment.sh <PI_IP> <CLIENT_IP>
+#   bash experiment/experiment.sh [PI_IP]
 #
 # 範例：
-#   bash experiment/experiment.sh 192.168.4.1 192.168.4.41
+#   bash experiment/experiment.sh 192.168.4.1
 #
 # 注意：
-#   - 需要先在 Pi 上啟動 iperf3 -s 和 flow_monitor
-#   - iperf3 流量用 --bind 綁定 CLIENT_IP，確保走 wlan1 出去
-#   - VOIP / STREAMING / CHAT 難以用一般工具忠實模擬，故本腳本不包含
-#     （VOIP 需 RTP 封包特徵；STREAMING 需持續大流量 + 特定 IAT；
-#      CHAT 需短封包 + 低頻率互動，與一般 HTTP 差異微妙）
+#   - 執行前先在 Pi 上啟動 iperf3 -s 與 flow_monitor
+#   - CLIENT_IP 自動偵測本機 192.168.4.x 介面，確保流量走 AP 網段出去
+#   - VOIP / STREAMING / CHAT 未納入：VOIP 需 RTP 封包特徵；STREAMING 需
+#     持續大流量加特定 IAT；CHAT 需短封包低頻率互動，皆難以忠實模擬
 
 set -euo pipefail
 
 PI_IP="${1:-192.168.4.1}"
-CLIENT_IP="${2:-192.168.4.41}"
+
+# 自動偵測 AP 網段介面 IP（192.168.4.x）
+CLIENT_IP=$(ip addr show | awk '/inet 192\.168\.4\./ {print $2}' | cut -d/ -f1 | head -n1)
+if [[ -z "$CLIENT_IP" ]]; then
+    echo "[exp] 錯誤：找不到 192.168.4.x 介面，請確認已連上 my_rpi_AP"
+    exit 1
+fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOG_DIR="$SCRIPT_DIR/../logs"
@@ -32,49 +38,19 @@ echo "[exp] ground truth log → $GT_LOG"
 echo "[exp] Pi=$PI_IP  Client=$CLIENT_IP"
 echo ""
 
-# 流量種類與對應的產生方式
-LABELS=("FT" "P2P" "BROWSING")
-
-# 隨機排列（Fisher-Yates）
-shuffle() {
-    local arr=("$@")
-    local n=${#arr[@]}
-    for ((i = n - 1; i > 0; i--)); do
-        j=$((RANDOM % (i + 1)))
-        tmp="${arr[i]}"
-        arr[i]="${arr[j]}"
-        arr[j]="$tmp"
-    done
-    echo "${arr[@]}"
-}
-
-# 隨機持續時間（30～90秒）
-rand_duration() {
-    echo $(( RANDOM % 61 + 30 ))
-}
-
-# 確保同種流量不連續出現
-build_sequence() {
-    local shuffled
-    shuffled=($(shuffle "${LABELS[@]}"))
-    local prev=""
-    local seq=()
-    for label in "${shuffled[@]}"; do
-        if [[ "$label" == "$prev" ]]; then
-            # 換一個不同的插到前面
-            for alt in "${LABELS[@]}"; do
-                if [[ "$alt" != "$label" ]]; then
-                    seq+=("$alt")
-                    prev="$alt"
-                    break
-                fi
-            done
-        fi
-        seq+=("$label")
-        prev="$label"
-    done
-    echo "${seq[@]}"
-}
+# 固定實驗序列：同種不連續，順序與時間無規律
+# 格式：label:duration_sec
+SEQUENCE=(
+    "BROWSING:45"
+    "FT:70"
+    "P2P:55"
+    "FT:35"
+    "BROWSING:80"
+    "P2P:40"
+    "BROWSING:60"
+    "FT:50"
+    "P2P:75"
+)
 
 run_traffic() {
     local label="$1"
@@ -102,12 +78,17 @@ run_traffic() {
     esac
 }
 
-SEQUENCE=($(build_sequence))
-echo "[exp] 實驗順序：${SEQUENCE[*]}"
+echo "[exp] 實驗序列："
+for item in "${SEQUENCE[@]}"; do
+    label="${item%%:*}"
+    duration="${item##*:}"
+    echo "      $label ${duration}s"
+done
 echo ""
 
-for label in "${SEQUENCE[@]}"; do
-    duration=$(rand_duration)
+for item in "${SEQUENCE[@]}"; do
+    label="${item%%:*}"
+    duration="${item##*:}"
     ts=$(date +"%Y-%m-%dT%H:%M:%S")
     echo "$ts,$label" >> "$GT_LOG"
     echo "[exp] ▶ $label  ${duration}s  (開始於 $ts)"
