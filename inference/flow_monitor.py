@@ -1,4 +1,5 @@
 import argparse
+import csv
 import sys
 import time
 import threading
@@ -17,6 +18,7 @@ IDLE_THRESHOLD_US = 5_000_000
 
 MODELS_DIR   = Path(__file__).parent.parent / "models"
 FEATURE_PATH = MODELS_DIR / "features.txt"
+LOGS_DIR     = Path(__file__).parent.parent / "logs"
 
 STABLE_N   = 3   # 連續幾次相同才改 mark
 SUMMARY_N  = 10  # 每幾個 tick 印一次統計摘要
@@ -143,16 +145,15 @@ def extract_features(flow: "FlowRecord", feature_cols: list[str]) -> "np.ndarray
 
 # ── Monitor ───────────────────────────────────────────────────────────
 class FlowMonitor:
-    def __init__(self, iface: str, model_path: Path, ground_truth: str | None):
+    def __init__(self, iface: str, model_path: Path, log_path: Path):
         self.iface         = iface
-        self.ground_truth  = ground_truth   # 當前 app 類別，None 表示不量準確度
         self.feature_cols  = _load_features(FEATURE_PATH)
 
         self.ip_label_history: dict[str, list[str]] = {}
 
         self.session    = ort.InferenceSession(str(model_path))
         self.input_name = self.session.get_inputs()[0].name
-        model_name = model_path.stem  # 取檔名不含副檔名，例如 'rf', 'xgb', 'lgb'
+        model_name = model_path.stem
 
         if model_name != "rf":
             self.label_classes = _load_label_classes(model_path)
@@ -163,13 +164,18 @@ class FlowMonitor:
         self.lock = threading.Lock()
 
         # ── 統計資料 ──
-        self.infer_latencies: list[float] = []   # 每次 session.run 耗時（ms）
+        self.infer_latencies: list[float] = []
         self.label_counts:    dict[str, int] = {}
         self.tick_count       = 0
-        self.correct_ticks    = 0  # ground truth 吻合的 tick 數
-        self.total_ticks      = 0  # 有產生 stable label 的 tick 數
 
         self._proc = psutil.Process()
+
+        # ── Log 檔 ──
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        self._log_file = open(log_path, "w", newline="", buffering=1)
+        self._log_writer = csv.writer(self._log_file)
+        self._log_writer.writerow(["timestamp", "ip", "label"])
+        print(f"[monitor] log → {log_path}")
 
         self.infer_thread = threading.Thread(target=self._infer_loop, daemon=True)
         self.infer_thread.start()
@@ -181,8 +187,6 @@ class FlowMonitor:
             print(f"[monitor] label_classes: {self.label_classes}")
         else:
             print(f"[monitor] label_classes: 模型自帶字串輸出")
-        if self.ground_truth:
-            print(f"[monitor] ground_truth: {self.ground_truth}")
 
     def _make_key(self, pkt) -> tuple | None:
         if not pkt.haslayer(IP):
@@ -258,7 +262,7 @@ class FlowMonitor:
                 print(f"[vote]  {ip:<16} votes={votes} → {winner}")
             results.append((ip, winner))
 
-        # 穩定機制 + 準確度統計
+        # 穩定機制
         stable = []
         for ip, label in results:
             self.label_counts[label] = self.label_counts.get(label, 0) + 1
@@ -268,11 +272,9 @@ class FlowMonitor:
                 history.pop(0)
             if len(history) == STABLE_N and len(set(history)) == 1:
                 stable.append((ip, label))
+                ts = time.strftime("%Y-%m-%dT%H:%M:%S")
                 print(f"[stable] {ip:<16} → {label} (連續 {STABLE_N} 次)")
-                if self.ground_truth is not None:
-                    self.total_ticks += 1
-                    if label == self.ground_truth:
-                        self.correct_ticks += 1
+                self._log_writer.writerow([ts, ip, label])
 
         if stable:
             qos_controller.apply_batch(stable)
@@ -311,15 +313,6 @@ class FlowMonitor:
                     sorted(self.label_counts.items(), key=lambda x: -x[1])}
             print(f"[summary] label分布: {dist}")
 
-        # 準確度
-        if self.ground_truth is not None:
-            if self.total_ticks:
-                acc = self.correct_ticks / self.total_ticks * 100
-                print(f"[summary] 準確度: {self.correct_ticks}/{self.total_ticks} = {acc:.1f}%  "
-                      f"(ground_truth={self.ground_truth})")
-            else:
-                print(f"[summary] 準確度：尚無 stable tick")
-
         print(f"{'='*50}\n")
 
     def start(self):
@@ -332,14 +325,19 @@ def main():
                         help="監聽的網路介面")
     parser.add_argument("--model", default="rf",
                         help="模型名稱（不含 .onnx），預設 rf")
-    parser.add_argument("--ground-truth", default=None,
-                        choices=["VOIP", "STREAMING", "CHAT", "BROWSING",
-                                 "MAIL", "FT", "P2P"],
-                        help="當前流量的真實類別，用於準確度統計")
+    parser.add_argument("--log", default=None,
+                        help="推論 log 輸出路徑（CSV），預設 logs/infer_<model>_<timestamp>.csv")
     args = parser.parse_args()
 
     model_path = _resolve_model(args.model)
-    monitor    = FlowMonitor(args.iface, model_path, args.ground_truth)
+
+    if args.log:
+        log_path = Path(args.log)
+    else:
+        ts = time.strftime("%Y%m%d_%H%M%S")
+        log_path = LOGS_DIR / f"infer_{args.model}_{ts}.csv"
+
+    monitor = FlowMonitor(args.iface, model_path, log_path)
     monitor.start()
 
 
