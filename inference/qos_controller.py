@@ -79,18 +79,12 @@ def _mark_ip(ip: str, label: str):
         log.warning(f"未知 label: {label}，跳過")
         return
 
-    prev_label = _marked_ips.get(ip)
-    if prev_label == label:
-        return
-
-    # 刪舊規則
-    if prev_label is not None:
-        old_mark = LABEL_TO_MARK[prev_label]
-        _run(
-            f"iptables -t mangle -D FORWARD -d {ip} -i {IFACE} "
-            f"-j MARK --set-mark {old_mark}",
-            check=False,
-        )
+    # 不管 _marked_ips，直接查 iptables 刪除該 IP 所有舊規則
+    result = _run("iptables -t mangle -S FORWARD", check=False)
+    for line in result.stdout.splitlines():
+        if f"-d {ip}/32" in line and "-j MARK" in line:
+            del_cmd = line.replace("-A ", "-D ", 1)
+            _run(f"iptables -t mangle {del_cmd}", check=False)
 
     # 加新規則：下行封包目的地是 client_ip，從 wlan1 進（Pi 是 AP，client 封包
     # 從 wlan1 進來後 FORWARD 出去；但下行是從其他介面進、往 wlan1 出。
@@ -110,13 +104,7 @@ def apply_batch(results: list[tuple[str, str]]):
 
 def clear_all():
     log.info("清除所有 QoS 規則")
-    for ip, label in list(_marked_ips.items()):
-        mark = LABEL_TO_MARK.get(label, 0)
-        _run(
-            f"iptables -t mangle -D FORWARD -d {ip} -o {IFACE} "
-            f"-j MARK --set-mark {mark}",
-            check=False,
-        )
+    _run("iptables -t mangle -F FORWARD", check=False)
     _marked_ips.clear()
     _run(f"tc qdisc del dev {IFACE} root", check=False)
     log.info("清除完成")
