@@ -10,3 +10,4 @@ Thumbs.db
 .vscode/
 
 logs/*.json
+logs/flow_infer_log.csv
