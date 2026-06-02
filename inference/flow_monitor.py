@@ -19,6 +19,7 @@ IDLE_THRESHOLD_US = 5_000_000
 MODELS_DIR   = Path(__file__).parent.parent / "models"
 FEATURE_PATH = MODELS_DIR / "features.txt"
 LOGS_DIR     = Path(__file__).parent.parent / "logs"
+FLOW_LOG     = LOGS_DIR / "flow_infer_log.csv"
 
 STABLE_N   = 3   # 連續幾次相同才改 mark
 SUMMARY_N  = 10  # 每幾個 tick 印一次統計摘要
@@ -145,15 +146,15 @@ def extract_features(flow: "FlowRecord", feature_cols: list[str]) -> "np.ndarray
 
 # ── Monitor ───────────────────────────────────────────────────────────
 class FlowMonitor:
-    def __init__(self, iface: str, model_path: Path, log_path: Path):
-        self.iface         = iface
-        self.feature_cols  = _load_features(FEATURE_PATH)
+    def __init__(self, iface: str, model_path: Path, model_name: str):
+        self.iface        = iface
+        self.model_name   = model_name
+        self.feature_cols = _load_features(FEATURE_PATH)
 
         self.ip_label_history: dict[str, list[str]] = {}
 
         self.session    = ort.InferenceSession(str(model_path))
         self.input_name = self.session.get_inputs()[0].name
-        model_name = model_path.stem
 
         if model_name != "rf":
             self.label_classes = _load_label_classes(model_path)
@@ -170,12 +171,14 @@ class FlowMonitor:
 
         self._proc = psutil.Process()
 
-        # ── Log 檔 ──
-        log_path.parent.mkdir(parents=True, exist_ok=True)
-        self._log_file = open(log_path, "w", newline="", buffering=1)
+        # ── Log 檔（append 模式，跨實驗累積） ──
+        LOGS_DIR.mkdir(parents=True, exist_ok=True)
+        write_header = not FLOW_LOG.exists()
+        self._log_file   = open(FLOW_LOG, "a", newline="", buffering=1)
         self._log_writer = csv.writer(self._log_file)
-        self._log_writer.writerow(["timestamp", "ip", "label"])
-        print(f"[monitor] log → {log_path}")
+        if write_header:
+            self._log_writer.writerow(["timestamp", "ip", "label", "model"])
+        print(f"[monitor] log → {FLOW_LOG}  (append)")
 
         self.infer_thread = threading.Thread(target=self._infer_loop, daemon=True)
         self.infer_thread.start()
@@ -274,7 +277,7 @@ class FlowMonitor:
                 stable.append((ip, label))
                 ts = time.strftime("%Y-%m-%dT%H:%M:%S")
                 print(f"[stable] {ip:<16} → {label} (連續 {STABLE_N} 次)")
-                self._log_writer.writerow([ts, ip, label])
+                self._log_writer.writerow([ts, ip, label, self.model_name])
 
         if stable:
             qos_controller.apply_batch(stable)
@@ -325,19 +328,10 @@ def main():
                         help="監聽的網路介面")
     parser.add_argument("--model", default="rf",
                         help="模型名稱（不含 .onnx），預設 rf")
-    parser.add_argument("--log", default=None,
-                        help="推論 log 輸出路徑（CSV），預設 logs/infer_<model>_<timestamp>.csv")
     args = parser.parse_args()
 
     model_path = _resolve_model(args.model)
-
-    if args.log:
-        log_path = Path(args.log)
-    else:
-        ts = time.strftime("%Y%m%d_%H%M%S")
-        log_path = LOGS_DIR / f"infer_{args.model}_{ts}.csv"
-
-    monitor = FlowMonitor(args.iface, model_path, log_path)
+    monitor = FlowMonitor(args.iface, model_path, args.model)
     monitor.start()
 
 

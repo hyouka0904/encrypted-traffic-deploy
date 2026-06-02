@@ -60,6 +60,45 @@
     }
     .info-box .value.mono { font-family: monospace; }
 
+    /* ── Experiment ── */
+    .experiment-section {
+      border-top: 1px solid #e2e8f0;
+      padding-top: 1.5rem;
+      margin-bottom: 1.75rem;
+    }
+    .experiment-section h2 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #0f172a;
+      margin-bottom: 0.75rem;
+    }
+    #exp-btn {
+      width: 100%;
+      padding: 0.65rem 1rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      background: #2563eb;
+      color: white;
+      transition: background 0.15s;
+    }
+    #exp-btn:hover:not(:disabled) { background: #1d4ed8; }
+    #exp-btn.btn-stop             { background: #dc2626; }
+    #exp-btn.btn-stop:hover:not(:disabled) { background: #b91c1c; }
+    #exp-btn:disabled { background: #94a3b8; cursor: not-allowed; }
+
+    #exp-status {
+      margin-top: 0.85rem;
+      font-size: 0.85rem;
+      color: #475569;
+      min-height: 1.2em;
+    }
+    #exp-status .phase { font-weight: 600; color: #0f172a; }
+    #exp-status .done  { color: #16a34a; font-weight: 600; }
+    #exp-status .err   { color: #b91c1c; font-weight: 600; }
+
     .footer {
       display: flex;
       justify-content: space-between;
@@ -94,10 +133,18 @@
       </div>
     </div>
 
+    <div class="experiment-section">
+      <h2>Traffic Classification Experiment</h2>
+      <button id="exp-btn">Start Experiment</button>
+      <div id="exp-status"></div>
+    </div>
+
     <div class="footer">
       <a href="http://example.com">Continue browsing →</a>
       <a class="danger" href="/user/logout">Sign out</a>
     </div>
   </div>
+
+  <script src="/static/experiment.js"></script>
 </body>
 </html>

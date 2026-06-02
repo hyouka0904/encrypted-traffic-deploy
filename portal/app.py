@@ -1,10 +1,13 @@
+import csv
 import os
 import sqlite3
 import subprocess
 from contextlib import contextmanager
+from datetime import datetime
 from functools import wraps
+from pathlib import Path
 
-from flask import Flask, redirect, render_template, request, session, url_for
+from flask import Flask, jsonify, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
 app = Flask(__name__)
@@ -17,9 +20,15 @@ AP_IFACE    = "wlan1"
 ADMIN_USER          = os.environ.get("ADMIN_USER", "admin")
 ADMIN_PASSWORD_HASH = os.environ.get("ADMIN_PASSWORD_HASH", "")
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "portal.db")
+DB_PATH  = os.path.join(os.path.dirname(__file__), "portal.db")
+BASE_DIR = Path(__file__).parent.parent
+LOGS_DIR = BASE_DIR / "logs"
+FLOW_LOG = LOGS_DIR / "flow_infer_log.csv"
 
 authorized_ips: set[str] = set()
+
+# 實驗狀態：key = client IP，value = {"start_time": datetime}
+experiment_sessions: dict[str, dict] = {}
 
 
 # ── Database ──────────────────────────────────────────────────────────
@@ -182,6 +191,84 @@ def user_logout():
     session.pop("username", None)
     session.pop("traffic_class", None)
     return redirect(url_for("portal"))
+
+
+# ── Experiment ────────────────────────────────────────────────────────
+
+@app.route("/experiment/start", methods=["POST"])
+@user_required
+def experiment_start():
+    ip         = client_ip()
+    start_time = datetime.now()
+    experiment_sessions[ip] = {"start_time": start_time}
+    print(f"[experiment] start  ip={ip}  t={start_time.isoformat()}")
+    return jsonify({"status": "ok", "start_time": start_time.isoformat()})
+
+
+@app.route("/experiment/stop", methods=["POST"])
+@user_required
+def experiment_stop():
+    ip = client_ip()
+    sess = experiment_sessions.pop(ip, None)
+    if sess is None:
+        return jsonify({"status": "error", "message": "no experiment running"}), 400
+
+    stop_time  = datetime.now()
+    start_time = sess["start_time"]
+
+    print(f"[experiment] stop   ip={ip}  t={stop_time.isoformat()}")
+
+    if not FLOW_LOG.exists():
+        return jsonify({"status": "error", "message": "flow_infer_log.csv not found"}), 500
+
+    matched    = []
+    model_name = "unknown"
+    with open(FLOW_LOG, newline="") as f:
+        for row in csv.DictReader(f):
+            try:
+                ts = datetime.strptime(row["timestamp"], "%Y-%m-%dT%H:%M:%S")
+            except ValueError:
+                continue
+            if row["ip"] != ip:
+                continue
+            if not (start_time <= ts <= stop_time):
+                continue
+            offset_sec = (ts - start_time).total_seconds()
+            model_name = row.get("model", "unknown")
+            matched.append({
+                "offset_sec": round(offset_sec, 1),
+                "ip":         row["ip"],
+                "label":      row["label"],
+                "model":      model_name,
+            })
+
+    LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    ts_str   = stop_time.strftime("%Y%m%d_%H%M%S")
+    out_path = LOGS_DIR / f"infer_{model_name}_{ts_str}.csv"
+
+    with open(out_path, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=["offset_sec", "ip", "label", "model"])
+        writer.writeheader()
+        writer.writerows(matched)
+
+    print(f"[experiment] infer log → {out_path}  ({len(matched)} rows)")
+    return jsonify({
+        "status":    "ok",
+        "infer_log": str(out_path),
+        "rows":      len(matched),
+        "model":     model_name,
+    })
+
+
+@app.route("/experiment/abort", methods=["POST"])
+@user_required
+def experiment_abort():
+    ip   = client_ip()
+    sess = experiment_sessions.pop(ip, None)
+    if sess is None:
+        return jsonify({"status": "error", "message": "no experiment running"}), 400
+    print(f"[experiment] abort  ip={ip}")
+    return jsonify({"status": "ok"})
 
 
 # ── Admin ─────────────────────────────────────────────────────────────
