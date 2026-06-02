@@ -55,10 +55,8 @@ encrypted-traffic-deploy/
 │   └── features.txt           # 特徵欄位順序（與訓練端一致，15 欄）
 ├── configs/
 │   └── qos_policy.yaml        # 各流量 class 的頻寬設定
-├── logs/
-│   └── .gitkeep               # flow_infer_log.csv 與 infer_*.csv 皆不推 git
-├── results/
-│   └── .gitkeep               # eval.py 輸出的 result_*.json（推 git）
+├── logs/                      # flow_infer_log.csv 與 infer_*.csv（不推 git，程式自動建立）
+├── results/                   # eval.py 輸出的 result_*.json（推 git）
 └── requirements.txt
 ```
 
@@ -406,15 +404,9 @@ Demo 情境：兩台 client 各套不同 class（例如一台 FT、一台 P2P）
 
 ### 版本控制與目錄
 
-`logs/` 整個目錄不推 git（避免 demo 時多人重複按產生大量 log）；`results/` 推 git（eval 輸出的結果）。`.gitignore` 設定：
+`logs/` 整個目錄不推 git（避免 demo 時多人重複按產生大量 log）；`results/` 推 git（eval 輸出的結果）。
 
-```
-logs/
-!logs/.gitkeep
-portal/static/testfile.bin
-```
-
-`!logs/.gitkeep` 例外讓空的 `logs/` 目錄能進 git，否則 clone 下來不會有此目錄。即便如此，`flow_monitor.py` 和 `app.py` 在寫檔前都應先 `mkdir -p logs`，確保目錄存在不會出錯。`results/` 同理保留 `.gitkeep`。
+`logs/` 與 `results/` 都不保留 `.gitkeep`，目錄由程式在寫檔前以 `mkdir -p` 自動建立（`flow_monitor.py`、`app.py` 建 `logs/`；`eval.py` 建 `results/`），所以 clone 下來沒有這兩個目錄也不會出錯。`.gitignore` 需包含 `logs/` 與 `portal/static/testfile.bin`。
 
 ### 設計概念
 
@@ -561,12 +553,24 @@ DHCP 派發範圍：`192.168.4.10` ~ `192.168.4.50`
 
 ## 待辦
 
-### 【最高優先】流量分類實驗
+### 流量分類實驗
 
-- [ ] RF / XGB / LGB 三模型各跑一次完整實驗流程，各自產生 infer log，用 eval.py 計算準確度
-- [ ] **修 eval.py 輸出**：目前 eval.py 對齊與計算邏輯已完成，但輸出格式需改為單一 result 檔案，存到 `results/result_<model>_<timestamp>.json`（model 與 timestamp 從 infer log 檔名解析）。檔案內含三部分：(1) 準確度統計（overall + per-label + predicted_as）、(2) 逐筆推論明細（offset, ip, predicted, ground_truth, correct）、(3) 使用的 ground truth 序列本身。`results/` 推 git，`logs/` 全部不推
+實驗設計細節見上方「流量分類實驗」說明節。以下為尚未完成的實作，依賴順序排列：
+
+- [ ] **`inference/flow_monitor.py`**：目前仍是舊版（帶 `--ground-truth` / `--log` 參數、stable tick 寫指定 log）。需改為每個 stable tick append 一筆到 `logs/flow_infer_log.csv`，格式 `timestamp,ip,label,model`（`model` 取啟動時的 `--model` 值）；寫檔前 `mkdir -p logs`；拿掉 `--ground-truth` 和 `--log` 參數與相關準確度統計
+
+- [ ] **`portal/app.py`**：目前無實驗相關功能。需新增三項：(1) `POST /experiment/start`（`@user_required`，記下開始時間與 client IP 到記憶體狀態）；(2) `POST /experiment/stop`（`@user_required`，從 `logs/flow_infer_log.csv` 篩出「開始～結束時間內、該 client IP」的紀錄，將絕對 timestamp 換算成從開始時間算起的相對 offset 秒數，存成 `logs/infer_<model>_<timestamp>.csv`，欄位 `offset_sec,ip,label,model`）；(3) Flask static 路由提供 `portal/static/testfile.bin`（FT 流量用的大檔案，需先 `head -c 100M /dev/urandom > portal/static/testfile.bin` 產生，已 ignore）
+
+- [ ] **`portal/templates/status.html` + `portal/static/experiment.js`**：status 頁面加一顆「Start Experiment」按鈕。JS 獨立成 `portal/static/experiment.js`，用 `<script src="/static/experiment.js">` 載入（不要內嵌一大段）。按下後：先 `POST /experiment/start`，接著依 `experiment/ground_truth.csv` 的固定序列在瀏覽器內用 fetch 自動產生流量（BROWSING＝反覆短 GET；FT＝持續 fetch `/static/testfile.bin`；P2P＝低頻寬分散 fetch），序列跑完自動 `POST /experiment/stop`。頁面顯示目前階段與剩餘時間。注意 JS 在瀏覽器執行，Pi 端零安裝
+
+- [ ] **`experiment/eval.py`**：目前是舊版（用絕對時間戳對齊、讀 ground truth log、`--out` 指定單檔），與現行設計不符，需重寫。改為：用相對 offset 對齊（infer log 的 `offset_sec` 直接對 `ground_truth.csv` 的 offset 區間，不再 parse 時間戳，拿掉 `--start`）；`--gt` 預設 `experiment/ground_truth.csv`；拿掉 `--out`，固定輸出到 `results/result_<model>_<timestamp>.json`（model 與 timestamp 從 `--infer` 檔名解析，寫檔前 `mkdir -p results`）。result 檔含三部分：(1) 準確度統計（overall + per-label + predicted_as）、(2) 逐筆推論明細（offset, ip, predicted, ground_truth, correct）、(3) 使用的 ground truth 序列本身。對齊與準確度計算邏輯（區間判定、per-label、predicted_as）可沿用舊版 `assign_ground_truth` / `compute_metrics`，只需把時間戳換成 offset
+
+- [ ] 三模型實跑：flow_monitor 分別載入 rf / xgb / lgb 各跑一次完整實驗，各自產生 infer log，再用 eval.py 算準確度
+
 - [ ] 報告分開陳述「離線分類效能（test set 數字）」與「部署整合（即時迴路）」
+
 - [ ] 即時特徵保真度列為 future work：fiat/biat 欄位定義與命名不一致，即時 scapy 無法忠實重現；根本解是取得 ISCX 原始 PCAP、用自己控制的特徵提取重算 + 重訓（見訓練端 README）
+
 - [ ] 流量類別 future work：VOIP / STREAMING / CHAT 無法用瀏覽器 fetch 忠實模擬，需找對應工具或真實流量重放
 
 ---
