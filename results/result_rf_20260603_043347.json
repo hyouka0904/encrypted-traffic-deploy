@@ -1,0 +1,777 @@
+{
+  "metrics": {
+    "total": 100,
+    "correct": 31,
+    "overall_accuracy": 31.0,
+    "per_label": {
+      "BROWSING": {
+        "total": 37,
+        "correct": 0,
+        "accuracy": 0.0,
+        "predicted_as": {
+          "FT": 37
+        }
+      },
+      "FT": {
+        "total": 31,
+        "correct": 31,
+        "accuracy": 100.0,
+        "predicted_as": {
+          "FT": 31
+        }
+      },
+      "P2P": {
+        "total": 32,
+        "correct": 0,
+        "accuracy": 0.0,
+        "predicted_as": {
+          "FT": 32
+        }
+      }
+    }
+  },
+  "details": [
+    {
+      "offset_sec": 2.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "BROWSING",
+      "correct": false
+    },
+    {
+      "offset_sec": 7.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "BROWSING",
+      "correct": false
+    },
+    {
+      "offset_sec": 12.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "BROWSING",
+      "correct": false
+    },
+    {
+      "offset_sec": 17.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "BROWSING",
+      "correct": false
+    },
+    {
+      "offset_sec": 22.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "BROWSING",
+      "correct": false
+    },
+    {
+      "offset_sec": 27.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "BROWSING",
+      "correct": false
+    },
+    {
+      "offset_sec": 32.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "BROWSING",
+      "correct": false
+    },
+    {
+      "offset_sec": 37.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "BROWSING",
+      "correct": false
+    },
+    {
+      "offset_sec": 42.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "BROWSING",
+      "correct": false
+    },
+    {
+      "offset_sec": 47.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "FT",
+      "correct": true
+    },
+    {
+      "offset_sec": 53.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "FT",
+      "correct": true
+    },
+    {
+      "offset_sec": 58.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "FT",
+      "correct": true
+    },
+    {
+      "offset_sec": 63.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "FT",
+      "correct": true
+    },
+    {
+      "offset_sec": 68.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "FT",
+      "correct": true
+    },
+    {
+      "offset_sec": 73.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "FT",
+      "correct": true
+    },
+    {
+      "offset_sec": 78.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "FT",
+      "correct": true
+    },
+    {
+      "offset_sec": 83.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "FT",
+      "correct": true
+    },
+    {
+      "offset_sec": 89.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "FT",
+      "correct": true
+    },
+    {
+      "offset_sec": 94.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "FT",
+      "correct": true
+    },
+    {
+      "offset_sec": 99.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "FT",
+      "correct": true
+    },
+    {
+      "offset_sec": 104.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "FT",
+      "correct": true
+    },
+    {
+      "offset_sec": 109.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "FT",
+      "correct": true
+    },
+    {
+      "offset_sec": 114.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "FT",
+      "correct": true
+    },
+    {
+      "offset_sec": 120.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "P2P",
+      "correct": false
+    },
+    {
+      "offset_sec": 125.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "P2P",
+      "correct": false
+    },
+    {
+      "offset_sec": 130.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "P2P",
+      "correct": false
+    },
+    {
+      "offset_sec": 135.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "P2P",
+      "correct": false
+    },
+    {
+      "offset_sec": 140.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "P2P",
+      "correct": false
+    },
+    {
+      "offset_sec": 146.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "P2P",
+      "correct": false
+    },
+    {
+      "offset_sec": 151.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "P2P",
+      "correct": false
+    },
+    {
+      "offset_sec": 156.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "P2P",
+      "correct": false
+    },
+    {
+      "offset_sec": 161.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "P2P",
+      "correct": false
+    },
+    {
+      "offset_sec": 166.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "P2P",
+      "correct": false
+    },
+    {
+      "offset_sec": 171.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "FT",
+      "correct": true
+    },
+    {
+      "offset_sec": 177.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "FT",
+      "correct": true
+    },
+    {
+      "offset_sec": 182.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "FT",
+      "correct": true
+    },
+    {
+      "offset_sec": 187.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "FT",
+      "correct": true
+    },
+    {
+      "offset_sec": 192.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "FT",
+      "correct": true
+    },
+    {
+      "offset_sec": 197.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "FT",
+      "correct": true
+    },
+    {
+      "offset_sec": 202.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "FT",
+      "correct": true
+    },
+    {
+      "offset_sec": 208.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "BROWSING",
+      "correct": false
+    },
+    {
+      "offset_sec": 213.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "BROWSING",
+      "correct": false
+    },
+    {
+      "offset_sec": 218.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "BROWSING",
+      "correct": false
+    },
+    {
+      "offset_sec": 223.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "BROWSING",
+      "correct": false
+    },
+    {
+      "offset_sec": 228.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "BROWSING",
+      "correct": false
+    },
+    {
+      "offset_sec": 233.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "BROWSING",
+      "correct": false
+    },
+    {
+      "offset_sec": 238.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "BROWSING",
+      "correct": false
+    },
+    {
+      "offset_sec": 243.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "BROWSING",
+      "correct": false
+    },
+    {
+      "offset_sec": 249.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "BROWSING",
+      "correct": false
+    },
+    {
+      "offset_sec": 254.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "BROWSING",
+      "correct": false
+    },
+    {
+      "offset_sec": 259.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "BROWSING",
+      "correct": false
+    },
+    {
+      "offset_sec": 264.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "BROWSING",
+      "correct": false
+    },
+    {
+      "offset_sec": 269.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "BROWSING",
+      "correct": false
+    },
+    {
+      "offset_sec": 274.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "BROWSING",
+      "correct": false
+    },
+    {
+      "offset_sec": 279.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "BROWSING",
+      "correct": false
+    },
+    {
+      "offset_sec": 284.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "BROWSING",
+      "correct": false
+    },
+    {
+      "offset_sec": 289.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "P2P",
+      "correct": false
+    },
+    {
+      "offset_sec": 294.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "P2P",
+      "correct": false
+    },
+    {
+      "offset_sec": 299.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "P2P",
+      "correct": false
+    },
+    {
+      "offset_sec": 305.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "P2P",
+      "correct": false
+    },
+    {
+      "offset_sec": 310.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "P2P",
+      "correct": false
+    },
+    {
+      "offset_sec": 315.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "P2P",
+      "correct": false
+    },
+    {
+      "offset_sec": 320.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "P2P",
+      "correct": false
+    },
+    {
+      "offset_sec": 325.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "BROWSING",
+      "correct": false
+    },
+    {
+      "offset_sec": 330.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "BROWSING",
+      "correct": false
+    },
+    {
+      "offset_sec": 335.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "BROWSING",
+      "correct": false
+    },
+    {
+      "offset_sec": 340.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "BROWSING",
+      "correct": false
+    },
+    {
+      "offset_sec": 345.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "BROWSING",
+      "correct": false
+    },
+    {
+      "offset_sec": 350.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "BROWSING",
+      "correct": false
+    },
+    {
+      "offset_sec": 355.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "BROWSING",
+      "correct": false
+    },
+    {
+      "offset_sec": 360.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "BROWSING",
+      "correct": false
+    },
+    {
+      "offset_sec": 365.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "BROWSING",
+      "correct": false
+    },
+    {
+      "offset_sec": 370.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "BROWSING",
+      "correct": false
+    },
+    {
+      "offset_sec": 375.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "BROWSING",
+      "correct": false
+    },
+    {
+      "offset_sec": 381.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "BROWSING",
+      "correct": false
+    },
+    {
+      "offset_sec": 386.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "FT",
+      "correct": true
+    },
+    {
+      "offset_sec": 391.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "FT",
+      "correct": true
+    },
+    {
+      "offset_sec": 396.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "FT",
+      "correct": true
+    },
+    {
+      "offset_sec": 401.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "FT",
+      "correct": true
+    },
+    {
+      "offset_sec": 406.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "FT",
+      "correct": true
+    },
+    {
+      "offset_sec": 411.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "FT",
+      "correct": true
+    },
+    {
+      "offset_sec": 416.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "FT",
+      "correct": true
+    },
+    {
+      "offset_sec": 422.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "FT",
+      "correct": true
+    },
+    {
+      "offset_sec": 427.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "FT",
+      "correct": true
+    },
+    {
+      "offset_sec": 432.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "FT",
+      "correct": true
+    },
+    {
+      "offset_sec": 437.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "P2P",
+      "correct": false
+    },
+    {
+      "offset_sec": 442.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "P2P",
+      "correct": false
+    },
+    {
+      "offset_sec": 447.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "P2P",
+      "correct": false
+    },
+    {
+      "offset_sec": 452.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "P2P",
+      "correct": false
+    },
+    {
+      "offset_sec": 458.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "P2P",
+      "correct": false
+    },
+    {
+      "offset_sec": 463.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "P2P",
+      "correct": false
+    },
+    {
+      "offset_sec": 468.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "P2P",
+      "correct": false
+    },
+    {
+      "offset_sec": 473.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "P2P",
+      "correct": false
+    },
+    {
+      "offset_sec": 478.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "P2P",
+      "correct": false
+    },
+    {
+      "offset_sec": 483.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "P2P",
+      "correct": false
+    },
+    {
+      "offset_sec": 488.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "P2P",
+      "correct": false
+    },
+    {
+      "offset_sec": 494.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "P2P",
+      "correct": false
+    },
+    {
+      "offset_sec": 499.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "P2P",
+      "correct": false
+    },
+    {
+      "offset_sec": 504.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "P2P",
+      "correct": false
+    },
+    {
+      "offset_sec": 509.3,
+      "ip": "192.168.4.35",
+      "predicted": "FT",
+      "ground_truth": "P2P",
+      "correct": false
+    }
+  ],
+  "ground_truth": [
+    {
+      "offset_sec": 0.0,
+      "label": "BROWSING"
+    },
+    {
+      "offset_sec": 45.0,
+      "label": "FT"
+    },
+    {
+      "offset_sec": 115.0,
+      "label": "P2P"
+    },
+    {
+      "offset_sec": 170.0,
+      "label": "FT"
+    },
+    {
+      "offset_sec": 205.0,
+      "label": "BROWSING"
+    },
+    {
+      "offset_sec": 285.0,
+      "label": "P2P"
+    },
+    {
+      "offset_sec": 325.0,
+      "label": "BROWSING"
+    },
+    {
+      "offset_sec": 385.0,
+      "label": "FT"
+    },
+    {
+      "offset_sec": 435.0,
+      "label": "P2P"
+    }
+  ],
+  "model": "rf",
+  "timestamp": "20260603_043347",
+  "infer_log": "logs/infer_rf_20260603_043347.csv",
+  "gt_file": "/home/user/projects/encrypted-traffic-deploy/experiment/ground_truth.csv"
+}
